@@ -2,6 +2,10 @@
 
 Transfer photos and videos from an iPhone to a Windows PC over a local network, without installing an app on the iPhone.
 
+## Why I built this
+
+I have often needed a simple way to move photos and videos from my iPhone to my computer. Instead of only looking for an existing tool, I decided to build one myself. This project gives me a practical problem through which to learn software engineering: breaking a task into small parts, evaluating technical choices, and understanding the solution well enough to explain and improve it.
+
 > **Project status:** Planning. The application is not implemented yet. This repository documents its intended scope and will grow in small, reviewed milestones.
 
 ## Demo
