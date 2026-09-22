@@ -1,0 +1,32 @@
+[project]
+name = "phone-lan-transfer"
+version = "0.1.0.dev0"
+description = "Transfer photos and videos from a phone to a computer over a local network."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.13.0",
+    "pytest",
+    "ruff",
+]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "error",
+    "ignore:The anyio\\.abc\\.BlockingPortal alias is deprecated, use anyio\\.from_thread\\.BlockingPortal instead\\.:DeprecationWarning:starlette\\.testclient",
+]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
