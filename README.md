@@ -1,20 +1,20 @@
-# iPhone LAN Transfer
+# Phone LAN Transfer
 
-Transfer photos and videos from an iPhone to a Windows PC over a local network, without installing an app on the iPhone.
+Transfer photos and videos from a mobile device to a computer over a local network, without installing a mobile app.
 
 ## Why I built this
 
-I have often needed a simple way to move photos and videos from my iPhone to my computer. Instead of only looking for an existing tool, I decided to build one myself. This project gives me a practical problem through which to learn software engineering: breaking a task into small parts, evaluating technical choices, and understanding the solution well enough to explain and improve it.
+I have often needed a simple way to move photos and videos from my iPhone to my computer. Instead of only looking for an existing tool, I decided to build one myself. The project now targets modern mobile browsers and desktop operating systems while keeping iPhone with Safari to Windows as the first reference combination. This gives me a practical problem through which to learn software engineering: breaking a task into small parts, evaluating technical choices, and understanding the solution well enough to explain and improve it.
 
-> **Project status:** Planning. The application is not implemented yet. This repository documents its intended scope and will grow in small, reviewed milestones.
+> **Project status:** Early development. A minimal FastAPI server and health endpoint are implemented; file transfer is not implemented yet.
 
 ## Demo
 
-_A short GIF showing the QR code, iPhone upload page, and saved files will be added after the MVP is working._
+_A short GIF showing the QR code, mobile upload page, and saved files will be added after the MVP is working._
 
 ## Planned features
 
-- A local web server on the PC and a QR code that opens the upload page in Safari.
+- A local web server on the computer and a QR code that opens the upload page in a mobile browser.
 - A fresh access token each time the server starts.
 - Multiple photo and video uploads with visible progress and errors.
 - Streaming writes, unique safe filenames, and a configurable file size limit.
@@ -22,17 +22,30 @@ _A short GIF showing the QR code, iPhone upload page, and saved files will be ad
 
 ## Installation and usage
 
-Installation and usage commands will be added when the first runnable milestone is available. The planned environment is Python 3.11+ on Windows, with an iPhone and PC connected to the same local network.
+The current development server requires Python 3.11+ and
+[`uv`](https://docs.astral.sh/uv/). It can be started with:
+
+```bash
+uv sync
+uv run uvicorn phone_lan_transfer.main:app --app-dir src --host 127.0.0.1 --port 8000
+```
+
+Open <http://127.0.0.1:8000/health> to verify that the server returns
+`{"status":"ok"}`. The server is currently bound to the local computer only;
+phone access will be added in a later milestone.
 
 ## Architecture
 
-The Windows PC will host a local FastAPI server. The iPhone will open a single HTML, CSS, and JavaScript page in Safari by scanning a QR code, then upload files directly to the PC. A diagram and component notes will be added to `docs/ARCHITECTURE.md` when implementation begins.
+The receiving computer will host a local FastAPI server. A phone or tablet will open a single HTML, CSS, and JavaScript page in a modern browser by scanning a QR code, then upload files directly to the computer. A diagram and component notes will be added to `docs/ARCHITECTURE.md` when implementation begins.
+
+The core is designed for mobile devices with modern browsers and for Windows, macOS, and Linux receivers. This includes combinations such as iPhone to Windows, Android to macOS, or a tablet to Linux. Compatibility will be claimed only after each combination is tested. The first reference combination is iPhone with Safari to Windows.
 
 ## Known limitations and security
 
 - This tool is intended only for trusted local networks. Do not expose its server to the internet.
-- The iPhone and PC must be able to reach each other on the same network. Guest, hotel, and university networks may block device-to-device connections.
-- Windows Firewall may ask for permission when the server first starts.
+- The mobile device and computer must be able to reach each other on the same network. Guest, hotel, and university networks may block device-to-device connections.
+- The receiving computer's firewall may ask for permission or require a local-network rule when the server first starts.
+- File selection, media formats, paths, permissions, and firewall behavior can vary across browsers and operating systems.
 - The planned HTTP connection is unencrypted. Other devices with the ability to observe traffic on the network may see uploaded files or the access token. The threat model will be documented in `docs/SECURITY.md`.
 
 ## Roadmap
@@ -40,8 +53,9 @@ The Windows PC will host a local FastAPI server. The iPhone will open a single H
 1. Repository setup and a minimal server.
 2. QR access and a browser upload page.
 3. Safe streaming uploads, tests, and CI: MVP (`v0.1.0`).
-4. Optional HEIC conversion, EXIF date organization, and duplicate detection.
-5. Local administration page and Windows executable.
+4. Compatibility testing for Android browsers and macOS and Linux receivers.
+5. Optional HEIC conversion, EXIF date organization, and duplicate detection.
+6. Local administration page and platform-specific desktop packages.
 
 ## License
 
