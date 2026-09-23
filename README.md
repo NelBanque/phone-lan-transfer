@@ -6,7 +6,9 @@ Transfer photos and videos from a mobile device to a computer over a local netwo
 
 I have often needed a simple way to move photos and videos from my iPhone to my computer. Instead of only looking for an existing tool, I decided to build one myself. The project now targets modern mobile browsers and desktop operating systems while keeping iPhone with Safari to Windows as the first reference combination. This gives me a practical problem through which to learn software engineering: breaking a task into small parts, evaluating technical choices, and understanding the solution well enough to explain and improve it.
 
-> **Project status:** Early development. A minimal FastAPI server and health endpoint are implemented; file transfer is not implemented yet.
+> **Project status:** Early development. A minimal FastAPI server, temporary
+> access token, and explicit LAN mode are implemented; the QR code and file
+> transfer are not implemented yet.
 
 ## Demo
 
@@ -23,16 +25,28 @@ _A short GIF showing the QR code, mobile upload page, and saved files will be ad
 ## Installation and usage
 
 The current development server requires Python 3.11+ and
-[`uv`](https://docs.astral.sh/uv/). It can be started with:
+[`uv`](https://docs.astral.sh/uv/). Prepare the environment and start the
+local-only server with:
 
 ```bash
 uv sync
-uv run uvicorn phone_lan_transfer.main:app --app-dir src --host 127.0.0.1 --port 8000
+uv run phone-lan-transfer
 ```
 
 Open <http://127.0.0.1:8000/health> to verify that the server returns
-`{"status":"ok"}`. The server is currently bound to the local computer only;
-phone access will be added in a later milestone.
+`{"status":"ok"}`. This default mode accepts connections only from the same
+computer.
+
+To listen for other devices on a trusted local network, start explicit LAN
+mode:
+
+```bash
+uv run phone-lan-transfer --lan
+```
+
+Use `--port 9000` to select a different port. LAN mode currently exposes only
+the development endpoints; phone access through a QR code will be added in the
+next step. Do not use LAN mode on a public or untrusted network.
 
 ## Architecture
 
