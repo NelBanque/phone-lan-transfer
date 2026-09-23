@@ -2,10 +2,20 @@
 
 from fastapi import FastAPI
 
-app = FastAPI(title="Phone LAN Transfer")
+from phone_lan_transfer.access import generate_access_token
 
 
-@app.get("/health")
-def health() -> dict[str, str]:
-    """Report that the local server is running."""
-    return {"status": "ok"}
+def create_app(access_token: str | None = None) -> FastAPI:
+    """Create an application with one access token for its lifetime."""
+    application = FastAPI(title="Phone LAN Transfer")
+    application.state.access_token = access_token or generate_access_token()
+
+    @application.get("/health")
+    def health() -> dict[str, str]:
+        """Report that the local server is running."""
+        return {"status": "ok"}
+
+    return application
+
+
+app = create_app()

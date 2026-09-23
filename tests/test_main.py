@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 
-from phone_lan_transfer.main import app
+from phone_lan_transfer.main import create_app
 
-client = TestClient(app)
+client = TestClient(create_app(access_token="test-token"))
 
 
 def test_health_returns_ok() -> None:
