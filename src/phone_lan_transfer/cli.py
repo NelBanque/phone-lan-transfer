@@ -7,6 +7,7 @@ import uvicorn
 
 from phone_lan_transfer.access import generate_access_token
 from phone_lan_transfer.main import create_app
+from phone_lan_transfer.network import detect_lan_ip
 
 DEFAULT_HOST = "127.0.0.1"
 LAN_HOST = "0.0.0.0"
@@ -46,5 +47,10 @@ def main(arguments: Sequence[str] | None = None) -> None:
     host = LAN_HOST if options.lan else DEFAULT_HOST
     access_token = generate_access_token()
     application = create_app(access_token=access_token)
+
+    if options.lan:
+        lan_ip = detect_lan_ip()
+        access_url = f"http://{lan_ip}:{options.port}/#token={access_token}"
+        print(f"Open this URL on your phone:\n{access_url}")
 
     uvicorn.run(application, host=host, port=options.port)
