@@ -41,8 +41,19 @@ def test_main_displays_lan_access_url(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    qr_arguments: dict[str, Any] = {}
+
+    class FakeQrCode:
+        def terminal(self, *, compact: bool) -> None:
+            qr_arguments["compact"] = compact
+
+    def fake_make_qr(content: str) -> FakeQrCode:
+        qr_arguments["content"] = content
+        return FakeQrCode()
+
     monkeypatch.setattr(cli, "generate_access_token", lambda: "test-token")
     monkeypatch.setattr(cli, "detect_lan_ip", lambda: "192.168.1.10")
+    monkeypatch.setattr(cli.segno, "make_qr", fake_make_qr)
     monkeypatch.setattr(cli.uvicorn, "run", lambda *args, **kwargs: None)
 
     cli.main(["--lan", "--port", "9000"])
@@ -51,6 +62,10 @@ def test_main_displays_lan_access_url(
         "Open this URL on your phone:\n"
         "http://192.168.1.10:9000/#token=test-token\n"
     )
+    assert qr_arguments == {
+        "content": "http://192.168.1.10:9000/#token=test-token",
+        "compact": True,
+    }
 
 
 def test_main_does_not_detect_lan_ip_in_local_mode(

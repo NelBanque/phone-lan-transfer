@@ -3,6 +3,7 @@
 import argparse
 from collections.abc import Sequence
 
+import segno
 import uvicorn
 
 from phone_lan_transfer.access import generate_access_token
@@ -52,5 +53,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
         lan_ip = detect_lan_ip()
         access_url = f"http://{lan_ip}:{options.port}/#token={access_token}"
         print(f"Open this URL on your phone:\n{access_url}")
+        qr_code = segno.make_qr(access_url)
+        qr_code.terminal(compact=True)
 
     uvicorn.run(application, host=host, port=options.port)
