@@ -49,6 +49,17 @@ URL and a terminal QR code for the phone. The browser upload page is not
 implemented yet, so the root URL currently has no user interface. Do not use
 LAN mode on a public or untrusted network.
 
+If automatic address detection selects the wrong interface on a computer with
+a VPN or multiple network connections, set the phone-facing IPv4 address
+manually:
+
+```bash
+uv run phone-lan-transfer --lan --lan-address 192.168.1.25
+```
+
+This changes the address printed in the access URL and encoded in the QR code.
+The server still listens on all IPv4 interfaces in explicit LAN mode.
+
 ## Architecture
 
 The receiving computer will host a local FastAPI server. A phone or tablet will open a single HTML, CSS, and JavaScript page in a modern browser by scanning a QR code, then upload files directly to the computer. A diagram and component notes will be added to `docs/ARCHITECTURE.md` when implementation begins.

@@ -61,7 +61,10 @@ def test_detect_lan_ip_reports_network_failure(
         network.detect_lan_ip()
 
 
-@pytest.mark.parametrize("address", ["127.0.0.1", "0.0.0.0"])
+@pytest.mark.parametrize(
+    "address",
+    ["127.0.0.1", "0.0.0.0", "224.0.0.1", "255.255.255.255"],
+)
 def test_detect_lan_ip_rejects_unusable_address(
     monkeypatch: pytest.MonkeyPatch,
     address: str,
@@ -77,5 +80,19 @@ def test_detect_lan_ip_rejects_invalid_ipv4(
 ) -> None:
     install_fake_socket(monkeypatch, FakeSocket(address="not-an-ip"))
 
-    with pytest.raises(RuntimeError, match="not valid IPv4"):
+    with pytest.raises(RuntimeError, match="No usable LAN address"):
         network.detect_lan_ip()
+
+
+@pytest.mark.parametrize("address", ["192.168.1.10", "10.8.0.2", "169.254.1.5"])
+def test_validate_lan_ip_accepts_usable_unicast_address(address: str) -> None:
+    assert network.validate_lan_ip(address) == address
+
+
+@pytest.mark.parametrize(
+    "address",
+    ["not-an-ip", "127.0.0.1", "0.0.0.0", "224.0.0.1", "255.255.255.255"],
+)
+def test_validate_lan_ip_rejects_invalid_or_unusable_address(address: str) -> None:
+    with pytest.raises(ValueError, match="LAN address must be"):
+        network.validate_lan_ip(address)

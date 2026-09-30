@@ -68,6 +68,35 @@ def test_main_displays_lan_access_url(
     }
 
 
+def test_main_uses_manual_lan_address(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    qr_content = ""
+
+    class FakeQrCode:
+        def terminal(self, *, compact: bool) -> None:
+            pass
+
+    def fake_make_qr(content: str) -> FakeQrCode:
+        nonlocal qr_content
+        qr_content = content
+        return FakeQrCode()
+
+    def fail_if_called() -> str:
+        raise AssertionError("LAN detection should not run with a manual address")
+
+    monkeypatch.setattr(cli, "generate_access_token", lambda: "test-token")
+    monkeypatch.setattr(cli, "detect_lan_ip", fail_if_called)
+    monkeypatch.setattr(cli.segno, "make_qr", fake_make_qr)
+    monkeypatch.setattr(cli.uvicorn, "run", lambda *args, **kwargs: None)
+
+    cli.main(["--lan", "--lan-address", "10.8.0.2"])
+
+    assert "http://10.8.0.2:8000/#token=test-token" in capsys.readouterr().out
+    assert qr_content == "http://10.8.0.2:8000/#token=test-token"
+
+
 def test_main_does_not_detect_lan_ip_in_local_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -84,3 +113,14 @@ def test_main_does_not_detect_lan_ip_in_local_mode(
 def test_main_rejects_invalid_port(port: str) -> None:
     with pytest.raises(SystemExit):
         cli.main(["--port", port])
+
+
+@pytest.mark.parametrize("address", ["not-an-ip", "127.0.0.1", "0.0.0.0"])
+def test_main_rejects_invalid_lan_address(address: str) -> None:
+    with pytest.raises(SystemExit):
+        cli.main(["--lan", "--lan-address", address])
+
+
+def test_main_rejects_lan_address_without_lan_mode() -> None:
+    with pytest.raises(SystemExit):
+        cli.main(["--lan-address", "192.168.1.10"])
