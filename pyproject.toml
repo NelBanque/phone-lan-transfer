@@ -1,7 +1,7 @@
 [project]
 name = "phone-lan-transfer"
 version = "0.1.0.dev0"
-description = "Transfer photos and videos from a phone to a computer over a local network."
+description = "Transfer files from a phone to a computer over a local network."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

@@ -1,10 +1,10 @@
 # Phone LAN Transfer
 
-Transfer photos and videos from a mobile device to a computer over a local network, without installing a mobile app.
+Transfer files from a mobile device directly to a computer over a local network, without installing a mobile app.
 
 ## Why I built this
 
-I have often needed a simple way to move photos and videos from my iPhone to my computer. Instead of only looking for an existing tool, I decided to build one myself. The project now targets modern mobile browsers and desktop operating systems while keeping iPhone with Safari to Windows as the first reference combination. This gives me a practical problem through which to learn software engineering: breaking a task into small parts, evaluating technical choices, and understanding the solution well enough to explain and improve it.
+I have often needed a simple way to move photos, videos, and other files from my iPhone to my computer. Instead of only looking for an existing tool, I decided to build one myself. The project now targets modern mobile browsers and desktop operating systems while keeping iPhone with Safari to Windows as the first reference combination. This gives me a practical problem through which to learn software engineering: breaking a task into small parts, evaluating technical choices, and understanding the solution well enough to explain and improve it.
 
 > **Project status:** Early development. The local server, temporary access
 > token, explicit LAN mode, terminal QR code, and responsive browser page are
@@ -18,7 +18,7 @@ _A short GIF showing the QR code, mobile upload page, and saved files will be ad
 
 - A local web server on the computer and a QR code that opens the upload page in a mobile browser.
 - A fresh access token each time the server starts.
-- Multiple photo and video uploads with visible progress and errors.
+- Multiple file uploads with visible progress and errors.
 - Streaming writes, unique safe filenames, and a configurable file size limit.
 - Command-line options for the port and destination folder.
 
@@ -62,7 +62,7 @@ The server still listens on all IPv4 interfaces in explicit LAN mode.
 
 ## Architecture
 
-The receiving computer will host a local FastAPI server. A phone or tablet will open a single HTML, CSS, and JavaScript page in a modern browser by scanning a QR code, then upload files directly to the computer. A diagram and component notes will be added to `docs/ARCHITECTURE.md` when implementation begins.
+The receiving computer will host a local FastAPI server. A phone or tablet will open a single HTML, CSS, and JavaScript page in a modern browser by scanning a QR code, then upload files directly into a local folder on the computer. The MVP will treat uploads as files rather than restricting them to particular media types, so it can transfer photos, videos, PDFs, documents, archives, and other formats. A diagram and component notes will be added to `docs/ARCHITECTURE.md` when implementation begins.
 
 The core is designed for mobile devices with modern browsers and for Windows, macOS, and Linux receivers. This includes combinations such as iPhone to Windows, Android to macOS, or a tablet to Linux. Compatibility will be claimed only after each combination is tested. The first reference combination is iPhone with Safari to Windows.
 
@@ -71,7 +71,8 @@ The core is designed for mobile devices with modern browsers and for Windows, ma
 - This tool is intended only for trusted local networks. Do not expose its server to the internet.
 - The mobile device and computer must be able to reach each other on the same network. Guest, hotel, and university networks may block device-to-device connections.
 - The receiving computer's firewall may ask for permission or require a local-network rule when the server first starts.
-- File selection, media formats, paths, permissions, and firewall behavior can vary across browsers and operating systems.
+- File selection, available file providers, paths, permissions, and firewall behavior can vary across browsers and operating systems.
+- Transferred files should be treated as untrusted unless they come from a device and source you trust.
 - The planned HTTP connection is unencrypted. Other devices with the ability to observe traffic on the network may see uploaded files or the access token. The threat model will be documented in `docs/SECURITY.md`.
 
 ## Roadmap

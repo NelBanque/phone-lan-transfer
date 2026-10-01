@@ -28,6 +28,8 @@ Avoid public, guest, hotel, university, or other shared networks.
 3. Accept firewall access only for a trusted or private network.
 4. Stop the server when the transfer is complete.
 5. Never configure router port forwarding or a public tunnel for this service.
+6. Open transferred files only when you trust their source. The application
+   will store general file types but will not prove that their contents are safe.
 
 More detailed engineering trade-offs are recorded in `docs/DECISIONS.md` as
 they are implemented and tested.
