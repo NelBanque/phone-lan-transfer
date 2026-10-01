@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f4f7fb">
+    <meta name="description" content="Transfer photos and videos to your computer over your local network.">
+    <title>Phone LAN Transfer</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="transfer-card" aria-labelledby="page-title">
+        <header class="hero">
+          <div class="brand-mark" aria-hidden="true">
+            <span></span>
+            <span></span>
+          </div>
+          <p class="eyebrow">Private local transfer</p>
+          <h1 id="page-title">Send files to your computer</h1>
+          <p class="intro">
+            Your photos and videos travel directly over this local network.
+          </p>
+        </header>
+
+        <section class="connection" id="connection-status" data-state="checking" aria-live="polite">
+          <span class="status-icon" aria-hidden="true"></span>
+          <div>
+            <h2 id="status-title">Checking your link&hellip;</h2>
+            <p id="status-message">This will only take a moment.</p>
+          </div>
+        </section>
+
+        <section class="upload-preview" aria-labelledby="upload-title">
+          <div class="preview-icon" aria-hidden="true">
+            <span class="arrow"></span>
+          </div>
+          <div>
+            <h2 id="upload-title">Ready for the next step</h2>
+            <p>Photo and video selection will be added here soon.</p>
+          </div>
+        </section>
+
+        <footer class="privacy-note">
+          <span class="lock-icon" aria-hidden="true"></span>
+          <p>Keep this page open and stay connected to the same trusted network.</p>
+        </footer>
+
+        <noscript>
+          <p class="noscript-message">JavaScript is required to verify this transfer link.</p>
+        </noscript>
+      </section>
+    </main>
+  </body>
+</html>

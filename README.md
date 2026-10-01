@@ -6,9 +6,9 @@ Transfer photos and videos from a mobile device to a computer over a local netwo
 
 I have often needed a simple way to move photos and videos from my iPhone to my computer. Instead of only looking for an existing tool, I decided to build one myself. The project now targets modern mobile browsers and desktop operating systems while keeping iPhone with Safari to Windows as the first reference combination. This gives me a practical problem through which to learn software engineering: breaking a task into small parts, evaluating technical choices, and understanding the solution well enough to explain and improve it.
 
-> **Project status:** Early development. A minimal FastAPI server, temporary
-> access token, explicit LAN mode, and terminal QR code are implemented; the
-> browser upload page and file transfer are not implemented yet.
+> **Project status:** Early development. The local server, temporary access
+> token, explicit LAN mode, terminal QR code, and responsive browser page are
+> implemented; file selection and transfer are not implemented yet.
 
 ## Demo
 
@@ -45,9 +45,9 @@ uv run phone-lan-transfer --lan
 ```
 
 Use `--port 9000` to select a different port. LAN mode prints both an access
-URL and a terminal QR code for the phone. The browser upload page is not
-implemented yet, so the root URL currently has no user interface. Do not use
-LAN mode on a public or untrusted network.
+URL and a terminal QR code for the phone. The root URL now serves a responsive
+browser page that verifies the temporary link, but file selection and uploads
+are not implemented yet. Do not use LAN mode on a public or untrusted network.
 
 If automatic address detection selects the wrong interface on a computer with
 a VPN or multiple network connections, set the phone-facing IPv4 address
