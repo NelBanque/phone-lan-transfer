@@ -17,38 +17,53 @@
             <span></span>
             <span></span>
           </div>
-          <p class="eyebrow">Private local transfer</p>
+          <p class="eyebrow">Phone LAN Transfer</p>
           <h1 id="page-title">Send files to your computer</h1>
-          <p class="intro">
-            Your files travel directly to this computer over the local network.
-          </p>
         </header>
 
-        <section class="connection" id="connection-status" data-state="checking" aria-live="polite">
+        <section class="connection" id="connection-status" aria-live="polite" hidden>
           <span class="status-icon" aria-hidden="true"></span>
           <div>
-            <h2 id="status-title">Checking your link&hellip;</h2>
-            <p id="status-message">This will only take a moment.</p>
+            <h2 id="status-title">Transfer link incomplete</h2>
+            <p id="status-message">Scan the QR code shown on your computer again.</p>
           </div>
         </section>
 
-        <section class="upload-preview" aria-labelledby="upload-title">
+        <section class="file-selection" aria-labelledby="selection-title">
           <div class="preview-icon" aria-hidden="true">
             <span class="arrow"></span>
           </div>
           <div>
-            <h2 id="upload-title">Ready for the next step</h2>
-            <p>Choose photos, videos, documents, and other files here soon.</p>
+            <h2 id="selection-title">Choose files</h2>
+            <p>Photos, videos, documents, and more.</p>
           </div>
+          <input id="file-input" type="file" multiple hidden>
+          <button id="choose-files" class="choose-files" type="button" disabled>
+            Add files
+          </button>
         </section>
 
-        <footer class="privacy-note">
-          <span class="lock-icon" aria-hidden="true"></span>
-          <p>Keep this page open and stay connected to the same trusted network.</p>
-        </footer>
+        <section class="selection-results" aria-labelledby="selected-title">
+          <div class="selection-heading">
+            <h2 id="selected-title">Selected files</h2>
+            <p id="selection-summary" role="status">No files selected</p>
+          </div>
+          <ul id="selected-files" class="selected-files"></ul>
+        </section>
+
+        <details class="transfer-info">
+          <summary>
+            <span class="lock-icon" aria-hidden="true"></span>
+            <span>How it works</span>
+          </summary>
+          <div class="transfer-info-body">
+            <p>Files will go directly to this computer over the local network.</p>
+            <p>Use a trusted network and keep this page open during a transfer.</p>
+          </div>
+        </details>
 
         <noscript>
-          <p class="noscript-message">JavaScript is required to verify this transfer link.</p>
+          <p class="noscript-message">JavaScript is required to select files.</p>
         </noscript>
       </section>
     </main>
