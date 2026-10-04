@@ -8,7 +8,8 @@ I have often needed a simple way to move photos, videos, and other files from my
 
 > **Project status:** Early development. The local server, temporary access
 > token, explicit LAN mode, terminal QR code, and responsive browser page are
-> implemented; file selection and transfer are not implemented yet.
+> implemented. The browser can select, preview supported media, rename pending
+> files, and remove them; transfer is not implemented yet.
 
 ## Demo
 
@@ -45,9 +46,13 @@ uv run phone-lan-transfer --lan
 ```
 
 Use `--port 9000` to select a different port. LAN mode prints both an access
-URL and a terminal QR code for the phone. The root URL now serves a responsive
-browser page that verifies the temporary link, but file selection and uploads
-are not implemented yet. Do not use LAN mode on a public or untrusted network.
+URL and a terminal QR code for the phone. The root URL serves a responsive
+browser page that reads the temporary link and lets you select, review, and
+remove files. Images and videos can be previewed when the browser supports
+their formats. You can set a destination name while keeping the file extension;
+the phone's original file is not renamed. The page does not validate the token
+with the server or upload files yet. Do not use LAN mode on a public or
+untrusted network.
 
 If automatic address detection selects the wrong interface on a computer with
 a VPN or multiple network connections, set the phone-facing IPv4 address
