@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -124,3 +125,35 @@ def test_main_rejects_invalid_lan_address(address: str) -> None:
 def test_main_rejects_lan_address_without_lan_mode() -> None:
     with pytest.raises(SystemExit):
         cli.main(["--lan-address", "192.168.1.10"])
+
+
+def test_main_passes_transfer_settings_to_application(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    applications: list[Any] = []
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        cli.uvicorn,
+        "run",
+        lambda application, **kwargs: applications.append(application),
+    )
+
+    cli.main(["--destination", "received files", "--max-file-bytes", "1234"])
+
+    settings = applications[0].state.transfer_settings
+    assert settings.destination_directory == tmp_path / "received files"
+    assert settings.max_file_bytes == 1234
+    assert not settings.destination_directory.exists()
+
+
+@pytest.mark.parametrize("limit", ["0", "-1", "1.5", "not-a-number"])
+def test_main_rejects_invalid_file_limit_before_starting_server(
+    monkeypatch: pytest.MonkeyPatch, limit: str
+) -> None:
+    def fail_if_called(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("Invalid settings must not start the server")
+
+    monkeypatch.setattr(cli.uvicorn, "run", fail_if_called)
+    with pytest.raises(SystemExit) as error:
+        cli.main(["--max-file-bytes", limit])
+    assert error.value.code == 2

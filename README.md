@@ -9,7 +9,8 @@ I have often needed a simple way to move photos, videos, and other files from my
 > **Project status:** Early development. The local server, temporary access
 > token, explicit LAN mode, terminal QR code, and responsive browser page are
 > implemented. The browser can select, preview supported media, rename pending
-> files, and remove them; transfer is not implemented yet.
+> files, and remove them. An authenticated streaming upload endpoint is
+> implemented and tested, but the browser cannot send files yet.
 
 ## Demo
 
@@ -64,6 +65,37 @@ uv run phone-lan-transfer --lan --lan-address 192.168.1.25
 
 This changes the address printed in the access URL and encoded in the QR code.
 The server still listens on all IPv4 interfaces in explicit LAN mode.
+
+Set the receiving folder and per-file byte limit at startup:
+
+```bash
+uv run phone-lan-transfer --destination "received files" --max-file-bytes 5368709120
+```
+
+The defaults are `./uploads` (relative to the startup directory) and 5 GiB per
+file. The limit must be a positive integer number of bytes. Startup does not
+create the folder or check whether it is writable. The upload endpoint uses
+these settings; browser sending and display of the limit remain pending.
+
+### Development upload API
+
+`POST /uploads?destination_name=<URL-encoded filename>` accepts one file as
+the raw request body. Send the current token in `Authorization: Bearer <token>`.
+This is not a multipart form upload. The server reads network chunks directly
+into the configured receiving folder and enforces the limit while writing,
+even when the request has no `Content-Length` header.
+
+After the write and file close succeed, the response is HTTP 201 with
+`{"status":"saved","destination_name":"photo.jpg"}`. This does not guarantee
+durability across power loss. Errors include 400 for an invalid name or an
+interrupted upload, 401 for invalid authentication, 409 for an existing name,
+413 for exceeding the limit, 507 for insufficient disk space, and 500 for other
+storage failures. A missing destination name returns 422. Handled write or
+connection failures remove the partial file; an abrupt process or power loss
+may still leave one. A disconnected phone may not receive the error response.
+
+The API has automated Windows tests, including separate network chunks and
+disconnect cleanup. End-to-end uploads from a phone have not been tested yet.
 
 ## Architecture
 
