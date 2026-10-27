@@ -366,6 +366,65 @@ h1 {
   font-size: 0.8rem;
 }
 
+.file-size-error {
+  margin: 0;
+  padding: 0 0.75rem 0.85rem;
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.retry-settings {
+  margin-top: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--text);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  cursor: pointer;
+}
+
+.retry-settings:focus-visible {
+  outline: 3px solid var(--brand-dark);
+  outline-offset: 3px;
+}
+
+.file-transfer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 0.75rem 0.85rem;
+}
+
+.transfer-status {
+  flex: 1;
+  margin: 0;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.send-file {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.85rem;
+  color: white;
+  background: var(--brand);
+  border: 0;
+  border-radius: 0.6rem;
+  cursor: pointer;
+}
+
+.send-file:disabled,
+.remove-file:disabled,
+.rename-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.send-file:focus-visible {
+  outline: 3px solid var(--brand-dark);
+  outline-offset: 3px;
+}
+
 .preview-icon {
   display: grid;
   width: 3rem;

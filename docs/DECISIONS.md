@@ -2,6 +2,21 @@
 
 This log records decisions made during the project. Entries describe the current direction and may be revised when testing reveals a better approach.
 
+Browser destination-name feedback now follows the server's 255-byte UTF-8
+limit, including the extension, and its reserved-name, whitespace, control
+character, and Unicode rules. Specific messages let users correct a name
+before sending. Browser checks remain advisory; the server validates uploads
+independently. JavaScript uses `TextEncoder` after rejecting unpaired Unicode
+surrogates, which the encoder would otherwise replace silently.
+
+The browser now sends one raw `File` per explicit Send action using `fetch`.
+Each entry has pending, sending, saved, and failed states and manual retry.
+Names are locked while sending and after saving; in-flight entries cannot be
+removed. Saved requires HTTP 201 and the expected confirmation body. A lost or
+invalid confirmation produces an uncertainty message, since the file may
+already exist on the computer. Percentage progress is deferred to a separate
+step; the interface shows an ongoing state without inventing a percentage.
+
 | Decision | Why | Alternative considered | Trade-off |
 | --- | --- | --- | --- |
 | Run a local web server on the receiving computer and use a browser on the phone. | The phone needs no installed app, the transfer stays on the local network, and the same web architecture can support multiple platforms. | Build separate native mobile apps. | Both devices must be able to reach each other; local HTTP has security limits and browser behavior varies. |

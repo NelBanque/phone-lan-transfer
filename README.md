@@ -10,7 +10,10 @@ I have often needed a simple way to move photos, videos, and other files from my
 > token, explicit LAN mode, terminal QR code, and responsive browser page are
 > implemented. The browser can select, preview supported media, rename pending
 > files, and remove them. An authenticated streaming upload endpoint is
-> implemented and tested, but the browser cannot send files yet.
+> implemented and tested. The browser can send individual files and show
+> confirmed saves, errors, and manual retries. A first manual phone-to-Windows
+> transfer succeeded. Percentage progress and broader compatibility testing
+> remain pending.
 
 ## Demo
 
@@ -51,8 +54,16 @@ URL and a terminal QR code for the phone. The root URL serves a responsive
 browser page that reads the temporary link and lets you select, review, and
 remove files. Images and videos can be previewed when the browser supports
 their formats. You can set a destination name while keeping the file extension;
-the phone's original file is not renamed. The page does not validate the token
-with the server or upload files yet. Do not use LAN mode on a public or
+the phone's original file is not renamed. The page validates the token by
+requesting the active file-size limit and warns about files that exceed it.
+Destination-name feedback checks the full name against the server's 255-byte
+UTF-8 rule and identifies reserved names and forbidden characters. The server
+still validates every upload independently.
+Use each file's Send button to transfer it. Names cannot be edited while
+sending or after a confirmed save. Failed files offer Retry; existing names
+require correction. If a save cannot be confirmed after a connection failure,
+check the receiving folder before retrying. A retry never overwrites an
+existing file. Do not use LAN mode on a public or
 untrusted network.
 
 If automatic address detection selects the wrong interface on a computer with
@@ -75,9 +86,15 @@ uv run phone-lan-transfer --destination "received files" --max-file-bytes 536870
 The defaults are `./uploads` (relative to the startup directory) and 5 GiB per
 file. The limit must be a positive integer number of bytes. Startup does not
 create the folder or check whether it is writable. The upload endpoint uses
-these settings; browser sending and display of the limit remain pending.
+these settings; the browser displays the active limit and sends individual files.
 
 ### Development upload API
+
+`GET /transfer-settings` returns the active per-file limit in bytes, for example
+`{"max_file_bytes":5368709120}`. It requires the current Bearer token and does
+not expose the receiving folder. The browser queries it before enabling file
+selection. Connection errors offer a retry; invalid tokens require reopening
+the current QR link. The page displays the limit and flags oversized files.
 
 `POST /uploads?destination_name=<URL-encoded filename>` accepts one file as
 the raw request body. Send the current token in `Authorization: Bearer <token>`.
@@ -95,13 +112,23 @@ connection failures remove the partial file; an abrupt process or power loss
 may still leave one. A disconnected phone may not receive the error response.
 
 The API has automated Windows tests, including separate network chunks and
-disconnect cleanup. End-to-end uploads from a phone have not been tested yet.
+disconnect cleanup. On 2026-10-27, a user manually sent a file from a phone
+through the browser and confirmed receipt on Windows. The phone OS, browser
+version, file format, and byte-for-byte integrity were not recorded; this is
+an initial smoke test rather than a compatibility claim.
 
 ## Architecture
 
 The receiving computer will host a local FastAPI server. A phone or tablet will open a single HTML, CSS, and JavaScript page in a modern browser by scanning a QR code, then upload files directly into a local folder on the computer. The MVP will treat uploads as files rather than restricting them to particular media types, so it can transfer photos, videos, PDFs, documents, archives, and other formats. A diagram and component notes will be added to `docs/ARCHITECTURE.md` when implementation begins.
 
 The core is designed for mobile devices with modern browsers and for Windows, macOS, and Linux receivers. This includes combinations such as iPhone to Windows, Android to macOS, or a tablet to Linux. Compatibility will be claimed only after each combination is tested. The first reference combination is iPhone with Safari to Windows.
+
+## Development checks
+
+Run `uv run pytest` and `uv run ruff check .` for the Python checks.
+With Node.js installed, run `node --test tests/browser-settings.test.cjs` to
+check the browser settings flow with simulated network responses and page elements.
+These checks do not replace testing in a real mobile browser.
 
 ## Known limitations and security
 
