@@ -12,8 +12,8 @@ I have often needed a simple way to move photos, videos, and other files from my
 > files, and remove them. An authenticated streaming upload endpoint is
 > implemented and tested. The browser can send individual files and show
 > confirmed saves, errors, and manual retries. A first manual phone-to-Windows
-> transfer succeeded. Percentage progress and broader compatibility testing
-> remain pending.
+> transfer succeeded. Per-file upload progress is implemented; real-device
+> progress review and broader compatibility testing remain pending.
 
 ## Demo
 
@@ -59,7 +59,11 @@ requesting the active file-size limit and warns about files that exceed it.
 Destination-name feedback checks the full name against the server's 255-byte
 UTF-8 rule and identifies reserved names and forbidden characters. The server
 still validates every upload independently.
-Use each file's Send button to transfer it. Names cannot be edited while
+Use each file's Send button to transfer it. The progress bar reports bytes
+sent by the browser, with a percentage when the total is known. At 100%,
+the page still waits for the computer's save confirmation. File bytes are
+transferred directly without image conversion or recompression.
+Names cannot be edited while
 sending or after a confirmed save. Failed files offer Retry; existing names
 require correction. If a save cannot be confirmed after a connection failure,
 check the receiving folder before retrying. A retry never overwrites an

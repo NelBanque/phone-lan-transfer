@@ -13,10 +13,11 @@ function element() {
     append(...children) { this.children.push(...children); },
     replaceChildren() { this.children = []; },
     setAttribute(name, value) { this.attributes[name] = value; },
+    removeAttribute(name) { delete this.attributes[name]; delete this[name]; },
     focus() {},
     querySelectorAll(selector) {
       return this.children.flatMap((child) => [
-        ...(child.className === selector.slice(1) ? [child] : []),
+        ...((child.className || "").split(/\s+/).includes(selector.slice(1)) ? [child] : []),
         ...child.querySelectorAll(selector),
       ]);
     },
@@ -26,6 +27,27 @@ function element() {
 async function page(fetchResponse, hash = "#token=test-token") {
   const nodes = new Map();
   const calls = [];
+  const uploads = [];
+  class MockXMLHttpRequest {
+    constructor() {
+      this.listeners = {};
+      this.upload = element();
+      this.headers = {};
+      uploads.push(this);
+    }
+    addEventListener(event, handler) { this.listeners[event] = handler; }
+    open(method, url) { this.method = method; this.url = url; }
+    setRequestHeader(name, value) { this.headers[name] = value; }
+    send(body) {
+      calls.push([this.url, { method: this.method, headers: this.headers, body }]);
+      Promise.resolve().then(() => fetchResponse(this.url)).then(async (response) => {
+        this.status = response.status;
+        try { this.responseText = JSON.stringify(await response.json()); }
+        catch { this.responseText = "invalid JSON"; }
+        this.listeners.load();
+      }).catch(() => this.listeners.error());
+    }
+  }
   runInNewContext(script, {
     document: {
       querySelector(selector) {
@@ -38,21 +60,67 @@ async function page(fetchResponse, hash = "#token=test-token") {
       location: { hash, pathname: "/", search: "" },
       history: { replaceState() {} }, setTimeout, clearTimeout,
     },
-    URLSearchParams, AbortController, Intl, TextEncoder,
+    URLSearchParams, AbortController, Intl, TextEncoder, XMLHttpRequest: MockXMLHttpRequest,
     fetch: async (...args) => { calls.push(args); return fetchResponse(...args); },
   });
   await new Promise(setImmediate);
-  return { nodes, calls };
+  return { nodes, calls, uploads };
 }
 
 const settings = (limit) => ({ status: 200, ok: true, json: async () => ({ max_file_bytes: limit }) });
+
+test("progress updates in place, waits after 100%, and stays separate for each file", async () => {
+  let finish;
+  const pending = new Promise((resolve) => { finish = resolve; });
+  const { nodes, uploads } = await page((url) => url === "/transfer-settings" ? settings(100) : pending);
+  const list = pick(nodes, [{ name: "one.txt", size: 100 }, { name: "two.txt", size: 100 }]);
+  const sending = list.querySelectorAll(".send-file")[0].listeners.click();
+  const row = list.children[0];
+  const bar = list.querySelectorAll(".upload-progress")[0];
+  assert.equal(bar.value, undefined, "initial progress is indeterminate");
+  uploads[0].upload.listeners.progress({ lengthComputable: true, loaded: 25, total: 100 });
+  assert.equal(bar.value, 25);
+  assert.match(list.querySelectorAll(".transfer-status")[0].textContent, /25%/);
+  assert.match(list.querySelectorAll(".transfer-status")[1].textContent, /Pending/);
+  assert.equal(list.children[0], row, "progress must not rebuild previews or buttons");
+  uploads[0].upload.listeners.progress({ lengthComputable: false, loaded: 30, total: 0 });
+  assert.equal(bar.value, undefined);
+  assert.doesNotMatch(list.querySelectorAll(".transfer-status")[0].textContent, /%/);
+  uploads[0].upload.listeners.progress({ lengthComputable: true, loaded: 999, total: 1000 });
+  assert.equal(bar.value, 99, "do not round up to 100 before completion");
+  uploads[0].upload.listeners.load();
+  assert.equal(bar.value, 100);
+  assert.match(list.querySelectorAll(".transfer-status")[0].textContent, /Waiting/);
+  assert.notEqual(list.querySelectorAll(".send-file")[0].textContent, "Saved");
+  finish({ status: 201, json: async () => ({ status: "saved", destination_name: "one.txt" }) });
+  await sending;
+  assert.equal(list.querySelectorAll(".send-file")[0].textContent, "Saved");
+  assert.equal(list.querySelectorAll(".upload-progress").length, 0);
+});
+
+test("network error, abort, and timeout after upload completion remain uncertain and retry resets progress", async () => {
+  for (const event of ["error", "abort", "timeout"]) {
+    const { nodes, uploads } = await page((url) => url === "/transfer-settings" ? settings(100) : new Promise(() => {}));
+    const list = pick(nodes, [{ name: "test.txt", size: 100 }]);
+    const sending = list.querySelectorAll(".send-file")[0].listeners.click();
+    uploads[0].upload.listeners.load();
+    uploads[0].listeners[event]();
+    await sending;
+    assert.match(list.querySelectorAll(".transfer-status")[0].textContent, /may already be/);
+    assert.equal(list.querySelectorAll(".upload-progress").length, 0);
+    const retry = list.querySelectorAll(".send-file")[0].listeners.click();
+    assert.equal(list.querySelectorAll(".upload-progress")[0].value, undefined);
+    uploads[1].listeners.error();
+    await retry;
+  }
+});
 
 test("valid settings authenticate, display the actual limit, and flag only oversized files", async () => {
   const { nodes, calls } = await page(() => settings(10));
   assert.equal(calls[0][0], "/transfer-settings");
   assert.equal(calls[0][1].headers.Authorization, "Bearer test-token");
   assert.equal(nodes.get("#choose-files").disabled, false);
-  assert.match(nodes.get("#file-limit").textContent, /10 bytes/);
+  assert.equal(nodes.get("#file-limit").textContent, "Maximum per file: 10 B.");
   const input = nodes.get("#file-input");
   input.files = [{ name: "exact.txt", size: 10 }, { name: "large.txt", size: 11 }];
   input.listeners.change();
@@ -115,12 +183,23 @@ test("collision can be corrected and retried while other successful files remain
   await list.querySelectorAll(".send-file")[0].listeners.click();
   await list.querySelectorAll(".send-file")[1].listeners.click();
   assert.match(list.querySelectorAll(".transfer-status")[1].textContent, /already exists/);
+  assert.match(list.querySelectorAll(".transfer-status")[1].textContent, /^Error:/);
+  assert.equal(list.querySelectorAll(".transfer-status")[1].attributes.role, "alert");
+  assert.equal(list.querySelectorAll(".transfer-status-error").length, 1);
   list.querySelectorAll(".file-open")[1].listeners.click();
   const editor = list.querySelectorAll(".rename-input")[0];
   editor.value = "renamed";
   editor.listeners.input();
   await list.querySelectorAll(".send-file")[1].listeners.click();
   for (const button of list.querySelectorAll(".send-file")) assert.equal(button.textContent, "Saved");
+  assert.equal(list.querySelectorAll(".transfer-status-error").length, 0);
+});
+
+test("displayed binary limit follows server configuration without the exact byte count", async () => {
+  for (const gib of [2, 5, 8]) {
+    const { nodes } = await page(() => settings(gib * 1024 ** 3));
+    assert.equal(nodes.get("#file-limit").textContent, `Maximum per file: ${gib} GiB.`);
+  }
 });
 
 test("network loss and unconfirmed success never claim saved", async () => {

@@ -51,7 +51,7 @@
         throw new Error("Invalid file size limit");
       }
       maxFileBytes = settings.max_file_bytes;
-      fileLimit.textContent = `Maximum per file: ${formatSize(maxFileBytes)} (${new Intl.NumberFormat().format(maxFileBytes)} bytes).`;
+      fileLimit.textContent = `Maximum per file: ${formatSize(maxFileBytes)}.`;
       chooseFilesButton.disabled = false;
       renderSelectedFiles();
     } catch {
@@ -118,6 +118,49 @@
     return destinationNameError(entry.destinationName);
   }
 
+  function updateUploadProgress(entry) {
+    if (!entry.progressBar) return;
+    if (entry.percent === null) {
+      entry.progressBar.removeAttribute("value");
+    } else {
+      entry.progressBar.value = entry.percent;
+    }
+    entry.statusNode.textContent = entry.message;
+  }
+
+  function uploadWithProgress(entry, destinationName) {
+    return new Promise((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      const query = new URLSearchParams({ destination_name: destinationName });
+      request.upload.addEventListener("progress", (event) => {
+        if (entry.state !== "sending") return;
+        entry.percent = event.lengthComputable && event.total > 0
+          ? Math.min(100, Math.floor(event.loaded / event.total * 100)) : null;
+        entry.message = entry.percent === null ? "Sending... Keep this page open."
+          : entry.percent === 100 ? "100% sent. Waiting for the computer to confirm saving..."
+            : `Sending: ${entry.percent}%. Keep this page open.`;
+        updateUploadProgress(entry);
+      });
+      request.upload.addEventListener("load", () => {
+        if (entry.state !== "sending") return;
+        entry.percent = 100;
+        entry.message = "100% sent. Waiting for the computer to confirm saving...";
+        updateUploadProgress(entry);
+      });
+      request.addEventListener("load", () => resolve({
+        status: request.status,
+        ok: request.status >= 200 && request.status < 300,
+        json: () => JSON.parse(request.responseText),
+      }));
+      for (const event of ["error", "abort", "timeout"]) {
+        request.addEventListener(event, () => reject(new Error("Upload not confirmed")));
+      }
+      request.open("POST", `/uploads?${query}`);
+      request.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+      request.send(entry.file);
+    });
+  }
+
   async function sendFile(entry) {
     if (entry.state === "sending" || entry.state === "saved") return;
     const validationError = uploadValidationError(entry);
@@ -129,15 +172,11 @@
     }
     const destinationName = entry.destinationName;
     entry.state = "sending";
+    entry.percent = null;
     entry.message = "Sending… Keep this page open until the computer confirms the save.";
     renderSelectedFiles();
     try {
-      const query = new URLSearchParams({ destination_name: destinationName });
-      const response = await fetch(`/uploads?${query}`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: entry.file,
-      });
+      const response = await uploadWithProgress(entry, destinationName);
       if (!response.ok) {
         const errors = {
           400: "The name was rejected or the upload was interrupted. Check the name and retry.",
@@ -255,9 +294,22 @@
       const transfer = document.createElement("div");
       const transferStatus = document.createElement("p");
       transfer.className = "file-transfer";
-      transferStatus.className = "transfer-status";
-      transferStatus.setAttribute("role", "status");
-      transferStatus.textContent = entry.message || "Pending — not sent yet.";
+      const failed = entry.state === "failed";
+      transferStatus.className = failed ? "transfer-status transfer-status-error" : "transfer-status";
+      transferStatus.setAttribute("role", failed ? "alert" : "status");
+      transferStatus.textContent = failed ? `Error: ${entry.message}`
+        : entry.message || "Pending — not sent yet.";
+      entry.statusNode = transferStatus;
+      entry.progressBar = null;
+      if (entry.state === "sending") {
+        const progress = document.createElement("progress");
+        progress.className = "upload-progress";
+        progress.max = 100;
+        progress.setAttribute("aria-label", `Upload progress for ${entry.destinationName}`);
+        transfer.append(progress);
+        entry.progressBar = progress;
+        updateUploadProgress(entry);
+      }
       sendButton.className = "send-file";
       sendButton.type = "button";
       sendButton.textContent = entry.state === "saved" ? "Saved"

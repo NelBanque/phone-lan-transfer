@@ -76,6 +76,30 @@ def test_upload_preserves_existing_file_on_collision(tmp_path: Path) -> None:
     assert existing.read_bytes() == b"original"
 
 
+def test_repeated_collisions_allow_health_and_later_upload(tmp_path: Path) -> None:
+    existing = tmp_path / "existing.txt"
+    existing.write_bytes(b"original")
+    with upload_client(tmp_path) as client:
+        for _ in range(3):
+            response = client.post(
+                "/uploads",
+                params={"destination_name": "existing.txt"},
+                content=b"replacement",
+                headers=AUTHORIZATION,
+            )
+            assert response.status_code == 409
+            assert client.get("/health").json() == {"status": "ok"}
+        response = client.post(
+            "/uploads",
+            params={"destination_name": "new.txt"},
+            content=b"new",
+            headers=AUTHORIZATION,
+        )
+        assert response.status_code == 201
+    assert existing.read_bytes() == b"original"
+    assert (tmp_path / "new.txt").read_bytes() == b"new"
+
+
 def test_upload_enforces_configured_limit_without_content_length(
     tmp_path: Path,
 ) -> None:
