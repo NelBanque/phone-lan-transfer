@@ -24,7 +24,7 @@ function element() {
   };
 }
 
-async function page(fetchResponse, hash = "#token=test-token") {
+async function page(fetchResponse, hash = "#token=test-token", sessionStorage = tokenStorage()) {
   const nodes = new Map();
   const calls = [];
   const uploads = [];
@@ -57,6 +57,7 @@ async function page(fetchResponse, hash = "#token=test-token") {
       createElement: element,
     },
     window: {
+      sessionStorage,
       location: { hash, pathname: "/", search: "" },
       history: { replaceState() {} }, setTimeout, clearTimeout,
     },
@@ -68,6 +69,68 @@ async function page(fetchResponse, hash = "#token=test-token") {
 }
 
 const settings = (limit) => ({ status: 200, ok: true, json: async () => ({ max_file_bytes: limit }) });
+
+function tokenStorage() {
+  const values = new Map();
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
+  };
+}
+
+test("reload recovers the token but not selected files, and a new QR takes priority", async () => {
+  const storage = tokenStorage();
+  const first = await page(() => settings(100), "#token=first", storage);
+  pick(first.nodes, [{ name: "one.txt", size: 1 }]);
+  const reload = await page(() => settings(100), "", storage);
+  assert.equal(reload.calls[0][1].headers.Authorization, "Bearer first");
+  assert.equal(reload.nodes.get("#selected-files").children.length, 0);
+  await page(() => settings(100), "#token=new", storage);
+  const next = await page(() => settings(100), "", storage);
+  assert.equal(next.calls[0][1].headers.Authorization, "Bearer new");
+});
+
+test("settings and upload 401 discard stored access, but network errors preserve it", async () => {
+  for (const upload of [false, true]) {
+    const storage = tokenStorage();
+    const current = await page((url) => upload && url === "/transfer-settings"
+      ? settings(100) : { status: 401, ok: false }, "#token=old", storage);
+    if (upload) {
+      const list = pick(current.nodes, [{ name: "one.txt", size: 1 }]);
+      await list.querySelectorAll(".send-file")[0].listeners.click();
+    }
+    const reload = await page(() => settings(100), "", storage);
+    assert.equal(reload.calls.length, 0);
+  }
+  const storage = tokenStorage();
+  await page(() => { throw new Error("offline"); }, "#token=valid", storage);
+  const reload = await page(() => settings(100), "", storage);
+  assert.equal(reload.calls[0][1].headers.Authorization, "Bearer valid");
+});
+
+test("blocked storage keeps QR access usable and missing access disabled", async () => {
+  const blocked = {
+    getItem() { throw new Error("blocked"); },
+    setItem() { throw new Error("blocked"); },
+    removeItem() { throw new Error("blocked"); },
+  };
+  const current = await page(() => settings(100), "#token=qr", blocked);
+  assert.equal(current.calls[0][1].headers.Authorization, "Bearer qr");
+  assert.equal(current.nodes.get("#choose-files").disabled, false);
+  const reload = await page(() => settings(100), "", blocked);
+  assert.equal(reload.calls.length, 0);
+  await page(() => ({ status: 401, ok: false }), "#token=qr", blocked);
+});
+
+test("an explicitly empty QR token clears previous session access", async () => {
+  const storage = tokenStorage();
+  await page(() => settings(100), "#token=old", storage);
+  const empty = await page(() => settings(100), "#token=", storage);
+  assert.equal(empty.calls.length, 0);
+  const reload = await page(() => settings(100), "", storage);
+  assert.equal(reload.calls.length, 0);
+});
 
 test("progress updates in place, waits after 100%, and stays separate for each file", async () => {
   let finish;

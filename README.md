@@ -59,6 +59,13 @@ requesting the active file-size limit and warns about files that exceed it.
 Destination-name feedback checks the full name against the server's 255-byte
 UTF-8 rule and identifies reserved names and forbidden characters. The server
 still validates every upload independently.
+The page removes the token from the URL and keeps it in `sessionStorage` so
+reloading the same tab can recover access. A new QR token replaces the stored
+one; a server 401 response clears it. Restarting the server invalidates old
+tokens. Selected files are not restored after reload. If browser storage is
+blocked, the QR works for the current page, but reload requires reopening it.
+Storage remains accessible to scripts on the same origin. Browser session
+restoration or tab duplication may retain it; closing a tab is not revocation.
 Use each file's Send button to transfer it. The progress bar reports bytes
 sent by the browser, with a percentage when the total is known. At 100%,
 the page still waits for the computer's save confirmation. File bytes are

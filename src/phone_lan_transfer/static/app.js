@@ -14,8 +14,27 @@
   const selectedFiles = [];
   let openEntry = null;
   let previewUrl = null;
+  const tokenStorageKey = "phone-lan-transfer.access-token";
   const fragmentParameters = new URLSearchParams(window.location.hash.slice(1));
-  const accessToken = fragmentParameters.get("token");
+  let accessToken = fragmentParameters.get("token");
+  try {
+    if (fragmentParameters.has("token")) {
+      if (accessToken) window.sessionStorage.setItem(tokenStorageKey, accessToken);
+      else window.sessionStorage.removeItem(tokenStorageKey);
+    } else {
+      accessToken = window.sessionStorage.getItem(tokenStorageKey);
+    }
+  } catch {
+    // Storage may be blocked; a QR token still works in memory.
+  }
+
+  function forgetAccessToken() {
+    try {
+      window.sessionStorage.removeItem(tokenStorageKey);
+    } catch {
+      // Server validation remains authoritative when storage is unavailable.
+    }
+  }
 
   const cleanUrl = `${window.location.pathname}${window.location.search}`;
   window.history.replaceState(null, "", cleanUrl);
@@ -39,8 +58,9 @@
         signal: controller.signal,
       });
       if (response.status === 401) {
+        forgetAccessToken();
         statusTitle.textContent = "Transfer link expired or invalid";
-        statusMessage.textContent = "Scan the current QR code on your computer again.";
+        statusMessage.textContent = "Start the server on your computer, then scan its current QR code. If the page still does not respond, reload it.";
         status.hidden = false;
         fileLimit.textContent = "File size limit unavailable.";
         return;
@@ -178,6 +198,7 @@
     try {
       const response = await uploadWithProgress(entry, destinationName);
       if (!response.ok) {
+        if (response.status === 401) forgetAccessToken();
         const errors = {
           400: "The name was rejected or the upload was interrupted. Check the name and retry.",
           401: "The transfer link is invalid. Open the current QR link again.",

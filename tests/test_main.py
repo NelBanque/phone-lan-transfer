@@ -30,7 +30,7 @@ def test_browser_script_is_served() -> None:
     assert "window.location.hash" in response.text
     assert "window.history.replaceState" in response.text
     assert "localStorage" not in response.text
-    assert "sessionStorage" not in response.text
+    assert "sessionStorage" in response.text
 
 
 def test_health_returns_ok() -> None:
