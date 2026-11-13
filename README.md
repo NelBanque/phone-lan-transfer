@@ -7,46 +7,100 @@ Transfer files from a mobile device directly to a computer over a local network,
 I have often needed a simple way to move photos, videos, and other files from my iPhone to my computer. Instead of only looking for an existing tool, I decided to build one myself. The project now targets modern mobile browsers and desktop operating systems while keeping iPhone with Safari to Windows as the first reference combination. This gives me a practical problem through which to learn software engineering: breaking a task into small parts, evaluating technical choices, and understanding the solution well enough to explain and improve it.
 
 > **Project status:** Early development. The local server, temporary access
-> token, explicit LAN mode, terminal QR code, and responsive browser page are
+> token, LAN reception, terminal QR code, and responsive browser page are
 > implemented. The browser can select, preview supported media, rename pending
 > files, and remove them. An authenticated streaming upload endpoint is
 > implemented and tested. The browser can send individual files and show
 > confirmed saves, errors, and manual retries. A first manual phone-to-Windows
-> transfer succeeded. Per-file upload progress is implemented; real-device
-> progress review and broader compatibility testing remain pending.
+> transfer succeeded. Per-file upload progress and reload access recovery are
+> implemented and manually reviewed. A recorded iPhone-to-Windows ZIP transfer
+> passed size and SHA-256 verification; broader compatibility testing remains pending.
 
 ## Demo
 
 _A short GIF showing the QR code, mobile upload page, and saved files will be added after the MVP is working._
 
-## Planned features
+## Implemented features
 
 - A local web server on the computer and a QR code that opens the upload page in a mobile browser.
 - A fresh access token each time the server starts.
-- Multiple file uploads with visible progress and errors.
-- Streaming writes, unique safe filenames, and a configurable file size limit.
+- Multiple-file selection with individual Send actions, progress, errors, and retries.
+- Streaming writes, validated filenames, collision rejection, and a configurable file size limit.
 - Command-line options for the port and destination folder.
 
 ## Installation and usage
 
+### Use the application
+
+This development version requires Python 3.11+ and
+[`uv`](https://docs.astral.sh/uv/). It is not yet a standalone desktop download.
+After installing those prerequisites, install the tool from GitHub once:
+
+```powershell
+uv tool install git+https://github.com/NelBanque/phone-lan-transfer.git
+```
+
+This installs the version published on GitHub, not unpublished local changes.
+Git must also be available for this source installation. If the command is not
+found after installation, run `uv tool update-shell` and reopen your terminal.
+
+Start reception on a trusted local network:
+
+```powershell
+phonelt
+```
+
+The terminal shows the receiving folder, maximum size, QR code, and access URL.
+Keep the server running, scan the QR on your phone, select a file, and tap Send.
+Both devices must be able to reach each other on the same trusted network.
+Wait for Saved before closing the page. Stop the server with Ctrl+C.
+
+Defaults: the system Downloads folder's `Phone LAN Transfer` subfolder,
+5 GiB per file, port 8000, and LAN access enabled. The receiving subfolder is
+created when storage first needs it. The startup summary shows its full path.
+Use `-d` if you want another location; existing files are never overwritten.
+
+```powershell
+phonelt -h
+phonelt -m 10
+phonelt -m 0.5 -d "D:\Received files"
+phonelt -p 9000
+phonelt --local-only
+```
+
+| Option | Short form | Purpose |
+| --- | --- | --- |
+| `--help` | `-h` | Show options and examples without starting the server. |
+| `--destination PATH` | `-d PATH` | Choose the receiving folder. Relative paths use the startup directory. |
+| `--max-gib GIB` | `-m GIB` | Set a positive per-file limit in GiB; decimal values must represent whole bytes. |
+| `--port PORT` | `-p PORT` | Set the listening port. |
+| `--local-only` | | Listen only on this computer, without a phone QR. |
+| `--lan-address IPV4` | | Override the address shown to the phone, for VPN/multiple interfaces. |
+| `--max-file-bytes BYTES` | | Advanced exact-byte limit; cannot be combined with `-m`. |
+
+Use `-h` or `--help`, not `-help`. `phone-lan-transfer` remains an equivalent
+command, and the old `--lan` flag is accepted but no longer required.
+HTTP is unencrypted; never expose the server to the internet.
+
+### Develop or run a local checkout
+
 The current development server requires Python 3.11+ and
 [`uv`](https://docs.astral.sh/uv/). Prepare the environment and start the
-local-only server with:
+server with:
 
 ```bash
 uv sync
-uv run phone-lan-transfer
+uv run phonelt
 ```
 
 Open <http://127.0.0.1:8000/health> to verify that the server returns
-`{"status":"ok"}`. This default mode accepts connections only from the same
-computer.
+`{"status":"ok"}`. With `--local-only`, only this computer can connect.
+The default startup enables LAN access.
 
-To listen for other devices on a trusted local network, start explicit LAN
-mode:
+To run only on this computer:
 
 ```bash
-uv run phone-lan-transfer --lan
+uv run phonelt --local-only
 ```
 
 Use `--port 9000` to select a different port. LAN mode prints both an access
@@ -82,20 +136,20 @@ a VPN or multiple network connections, set the phone-facing IPv4 address
 manually:
 
 ```bash
-uv run phone-lan-transfer --lan --lan-address 192.168.1.25
+uv run phonelt --lan-address 192.168.1.25
 ```
 
 This changes the address printed in the access URL and encoded in the QR code.
-The server still listens on all IPv4 interfaces in explicit LAN mode.
+The server still listens on all IPv4 interfaces in default LAN mode.
 
 Set the receiving folder and per-file byte limit at startup:
 
 ```bash
-uv run phone-lan-transfer --destination "received files" --max-file-bytes 5368709120
+uv run phonelt -d "received files" -m 5
 ```
 
-The defaults are `./uploads` (relative to the startup directory) and 5 GiB per
-file. The limit must be a positive integer number of bytes. Startup does not
+The defaults are system Downloads/Phone LAN Transfer and 5 GiB per
+file. Storage receives a positive integer number of bytes. Startup does not
 create the folder or check whether it is writable. The upload endpoint uses
 these settings; the browser displays the active limit and sends individual files.
 
@@ -126,11 +180,16 @@ The API has automated Windows tests, including separate network chunks and
 disconnect cleanup. On 2026-10-27, a user manually sent a file from a phone
 through the browser and confirmed receipt on Windows. The phone OS, browser
 version, file format, and byte-for-byte integrity were not recorded; this is
-an initial smoke test rather than a compatibility claim.
+an initial smoke test rather than a compatibility claim. A later recorded
+iPhone/Safari-to-Windows ZIP transfer passed size and SHA-256 verification;
+see [manual verification](docs/TESTING.md) for the test scope and limitations.
 
 ## Architecture
 
-The receiving computer will host a local FastAPI server. A phone or tablet will open a single HTML, CSS, and JavaScript page in a modern browser by scanning a QR code, then upload files directly into a local folder on the computer. The MVP will treat uploads as files rather than restricting them to particular media types, so it can transfer photos, videos, PDFs, documents, archives, and other formats. A diagram and component notes will be added to `docs/ARCHITECTURE.md` when implementation begins.
+The receiving computer hosts a local FastAPI server. The mobile browser opens
+the QR link and sends selected files directly into the configured folder. See
+[architecture and file journey](docs/ARCHITECTURE.md) for component responsibilities,
+authentication, streaming storage, and save confirmation.
 
 The core is designed for mobile devices with modern browsers and for Windows, macOS, and Linux receivers. This includes combinations such as iPhone to Windows, Android to macOS, or a tablet to Linux. Compatibility will be claimed only after each combination is tested. The first reference combination is iPhone with Safari to Windows.
 
@@ -148,13 +207,13 @@ These checks do not replace testing in a real mobile browser.
 - The receiving computer's firewall may ask for permission or require a local-network rule when the server first starts.
 - File selection, available file providers, paths, permissions, and firewall behavior can vary across browsers and operating systems.
 - Transferred files should be treated as untrusted unless they come from a device and source you trust.
-- The planned HTTP connection is unencrypted. Other devices with the ability to observe traffic on the network may see uploaded files or the access token. The threat model will be documented in `docs/SECURITY.md`.
+- The HTTP connection is unencrypted. Other devices with the ability to observe traffic on the network may see uploaded files or the access token. See [security guidance](docs/SECURITY.md).
 
 ## Roadmap
 
 1. Repository setup and a minimal server.
 2. QR access and a browser upload page.
-3. Safe streaming uploads, tests, and CI: MVP (`v0.1.0`).
+3. Validate streaming uploads and document manual acceptance for the MVP (`v0.1.0`).
 4. Compatibility testing for Android browsers and macOS and Linux receivers.
 5. Optional HEIC conversion, EXIF date organization, and duplicate detection.
 6. Local administration page and platform-specific desktop packages.

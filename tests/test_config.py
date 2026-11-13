@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from phone_lan_transfer import config
 from phone_lan_transfer.config import TransferSettings
 from phone_lan_transfer.main import create_app
 from phone_lan_transfer.storage import DEFAULT_MAX_FILE_BYTES
@@ -12,11 +13,14 @@ def test_default_settings_resolve_destination_without_creating_it(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(config, "user_downloads_path", lambda: tmp_path / "Downloads")
 
     application = create_app(access_token="test-token")
     settings = application.state.transfer_settings
 
-    assert settings.destination_directory == tmp_path / "uploads"
+    assert (
+        settings.destination_directory == tmp_path / "Downloads" / "Phone LAN Transfer"
+    )
     assert settings.max_file_bytes == DEFAULT_MAX_FILE_BYTES
     assert not settings.destination_directory.exists()
 

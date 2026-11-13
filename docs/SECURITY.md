@@ -8,7 +8,7 @@ use. It must not be exposed to the internet.
 ## Main protections
 
 - A new random access token will be created each time the server starts.
-- LAN access will require an explicit startup option.
+- CLI startup enables LAN access and clearly reports it; `--local-only` disables it.
 - Protected requests will require the temporary token.
 - Uploads will use size limits, safe filenames, unique destinations, and
   streaming writes.

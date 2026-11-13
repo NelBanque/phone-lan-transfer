@@ -10,9 +10,10 @@ from phone_lan_transfer import cli
 @pytest.mark.parametrize(
     ("arguments", "expected_host", "expected_port"),
     [
-        ([], cli.DEFAULT_HOST, cli.DEFAULT_PORT),
+        ([], cli.LAN_HOST, cli.DEFAULT_PORT),
+        (["--local-only"], cli.DEFAULT_HOST, cli.DEFAULT_PORT),
         (["--lan"], cli.LAN_HOST, cli.DEFAULT_PORT),
-        (["--port", "9000"], cli.DEFAULT_HOST, 9000),
+        (["-p", "9000"], cli.LAN_HOST, 9000),
         (["--lan", "--port", "9000"], cli.LAN_HOST, 9000),
     ],
 )
@@ -59,10 +60,11 @@ def test_main_displays_lan_access_url(
 
     cli.main(["--lan", "--port", "9000"])
 
-    assert capsys.readouterr().out == (
-        "Open this URL on your phone:\n"
-        "http://192.168.1.10:9000/#token=test-token\n"
-    )
+    output = capsys.readouterr().out
+    assert "http://192.168.1.10:9000/#token=test-token" in output
+    assert "Receiving folder:" in output
+    assert "5 GiB" in output
+    assert "phonelt -h" in output
     assert qr_arguments == {
         "content": "http://192.168.1.10:9000/#token=test-token",
         "compact": True,
@@ -107,7 +109,7 @@ def test_main_does_not_detect_lan_ip_in_local_mode(
     monkeypatch.setattr(cli, "detect_lan_ip", fail_if_called)
     monkeypatch.setattr(cli.uvicorn, "run", lambda *args, **kwargs: None)
 
-    cli.main([])
+    cli.main(["--local-only"])
 
 
 @pytest.mark.parametrize("port", ["0", "65536", "not-a-number"])
@@ -122,9 +124,9 @@ def test_main_rejects_invalid_lan_address(address: str) -> None:
         cli.main(["--lan", "--lan-address", address])
 
 
-def test_main_rejects_lan_address_without_lan_mode() -> None:
+def test_main_rejects_lan_address_in_local_only_mode() -> None:
     with pytest.raises(SystemExit):
-        cli.main(["--lan-address", "192.168.1.10"])
+        cli.main(["--local-only", "--lan-address", "192.168.1.10"])
 
 
 def test_main_passes_transfer_settings_to_application(
@@ -138,7 +140,9 @@ def test_main_passes_transfer_settings_to_application(
         lambda application, **kwargs: applications.append(application),
     )
 
-    cli.main(["--destination", "received files", "--max-file-bytes", "1234"])
+    cli.main(
+        ["--local-only", "--destination", "received files", "--max-file-bytes", "1234"]
+    )
 
     settings = applications[0].state.transfer_settings
     assert settings.destination_directory == tmp_path / "received files"
