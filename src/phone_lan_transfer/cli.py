@@ -20,6 +20,16 @@ LAN_HOST = "0.0.0.0"
 DEFAULT_PORT = 8000
 
 
+class ReadableHelpFormatter(argparse.RawDescriptionHelpFormatter):
+    """Put option descriptions below their flags with space between entries."""
+
+    def __init__(self, prog: str) -> None:
+        super().__init__(prog, max_help_position=4)
+
+    def _format_action(self, action: argparse.Action) -> str:
+        return super()._format_action(action) + "\n"
+
+
 def valid_port(value: str) -> int:
     """Return a valid TCP port or raise an argparse error."""
     port = int(value)
@@ -70,7 +80,7 @@ def create_parser() -> argparse.ArgumentParser:
         prog="phonelt",
         allow_abbrev=False,
         description="Transfer files from a phone over a trusted local network.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=ReadableHelpFormatter,
         epilog=(
             "Examples:\n"
             "  phonelt                      Start and show the phone QR\n"
