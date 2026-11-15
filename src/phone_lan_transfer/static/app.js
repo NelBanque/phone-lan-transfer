@@ -6,6 +6,13 @@
   const chooseFilesButton = document.querySelector("#choose-files");
   const selectedFilesList = document.querySelector("#selected-files");
   const selectionSummary = document.querySelector("#selection-summary");
+  const selectionActions = document.querySelector("#selection-actions");
+  const reviewAllButton = document.querySelector("#review-all");
+  const sendAllButton = document.querySelector("#send-all");
+  const batchStatus = document.querySelector("#batch-status");
+  const batchProgressWrap = document.querySelector("#batch-progress-wrap");
+  const batchProgress = document.querySelector("#batch-progress");
+  const batchPercent = document.querySelector("#batch-percent");
   const fileLimit = document.querySelector("#file-limit");
   const retrySettingsButton = document.querySelector("#retry-settings");
   const statusTitle = document.querySelector("#status-title");
@@ -13,7 +20,11 @@
   let maxFileBytes = null;
   const selectedFiles = [];
   let openEntry = null;
-  let previewUrl = null;
+  let reviewAll = false;
+  let batchSending = false;
+  let batchEntries = null;
+  let accessRejected = false;
+  const previewUrls = new Set();
   const tokenStorageKey = "phone-lan-transfer.access-token";
   const fragmentParameters = new URLSearchParams(window.location.hash.slice(1));
   let accessToken = fragmentParameters.get("token");
@@ -148,24 +159,47 @@
     entry.statusNode.textContent = entry.message;
   }
 
+  function updateBatchProgress() {
+    if (!batchEntries) return;
+    const total = batchEntries.reduce((sum, entry) => sum + entry.file.size, 0);
+    const sent = batchEntries.reduce((sum, entry) => sum + (entry.bytesSent || 0), 0);
+    const finished = batchEntries.every((entry) => entry.state !== "pending" && entry.state !== "sending");
+    const percent = total === 0 ? (finished ? 100 : 0)
+      : Math.min(100, Math.floor(sent / total * 100));
+    batchProgress.value = percent;
+    batchPercent.textContent = percent === 100 && batchSending
+      ? "100% sent. Waiting for the computer to confirm saving..."
+      : `Total sent: ${percent}%`;
+  }
+
+  function clearBatchFeedback() {
+    batchEntries = null;
+    batchProgressWrap.hidden = true;
+    batchStatus.textContent = "";
+  }
+
   function uploadWithProgress(entry, destinationName) {
     return new Promise((resolve, reject) => {
       const request = new XMLHttpRequest();
       const query = new URLSearchParams({ destination_name: destinationName });
       request.upload.addEventListener("progress", (event) => {
         if (entry.state !== "sending") return;
+        entry.bytesSent = Math.max(entry.bytesSent || 0, Math.min(entry.file.size, event.loaded));
         entry.percent = event.lengthComputable && event.total > 0
           ? Math.min(100, Math.floor(event.loaded / event.total * 100)) : null;
         entry.message = entry.percent === null ? "Sending... Keep this page open."
           : entry.percent === 100 ? "100% sent. Waiting for the computer to confirm saving..."
             : `Sending: ${entry.percent}%. Keep this page open.`;
         updateUploadProgress(entry);
+        updateBatchProgress();
       });
       request.upload.addEventListener("load", () => {
         if (entry.state !== "sending") return;
         entry.percent = 100;
+        entry.bytesSent = entry.file.size;
         entry.message = "100% sent. Waiting for the computer to confirm saving...";
         updateUploadProgress(entry);
+        updateBatchProgress();
       });
       request.addEventListener("load", () => resolve({
         status: request.status,
@@ -181,8 +215,8 @@
     });
   }
 
-  async function sendFile(entry) {
-    if (entry.state === "sending" || entry.state === "saved") return;
+  async function sendFile(entry, fromBatch = false) {
+    if (accessRejected || (batchSending && !fromBatch) || entry.state === "sending" || entry.state === "saved") return;
     const validationError = uploadValidationError(entry);
     if (validationError) {
       entry.state = "failed";
@@ -198,7 +232,10 @@
     try {
       const response = await uploadWithProgress(entry, destinationName);
       if (!response.ok) {
-        if (response.status === 401) forgetAccessToken();
+        if (response.status === 401) {
+          accessRejected = true;
+          forgetAccessToken();
+        }
         const errors = {
           400: "The name was rejected or the upload was interrupted. Check the name and retry.",
           401: "The transfer link is invalid. Open the current QR link again.",
@@ -217,6 +254,7 @@
           throw new Error("Save not confirmed");
         }
         entry.state = "saved";
+        entry.bytesSent = entry.file.size;
         entry.message = "Saved on the computer.";
       }
     } catch {
@@ -224,6 +262,7 @@
       entry.message = "Saving could not be confirmed. The file may already be on the computer. Check before retrying; an existing name will not be overwritten.";
     }
     renderSelectedFiles();
+    updateBatchProgress();
   }
 
   function createPreview(file) {
@@ -241,7 +280,7 @@
 
     const media = document.createElement(isImage ? "img" : "video");
     const objectUrl = URL.createObjectURL(file);
-    previewUrl = objectUrl;
+    previewUrls.add(objectUrl);
     media.src = objectUrl;
     if (isImage) {
       media.alt = `Preview of ${file.name}`;
@@ -252,9 +291,9 @@
     }
     media.addEventListener("error", () => {
       preview.textContent = "This browser cannot preview this file.";
-      if (previewUrl === objectUrl) {
+      if (previewUrls.has(objectUrl)) {
         URL.revokeObjectURL(objectUrl);
-        previewUrl = null;
+        previewUrls.delete(objectUrl);
       }
     });
     preview.append(media);
@@ -262,10 +301,8 @@
   }
 
   function renderSelectedFiles() {
-    if (previewUrl !== null) {
-      URL.revokeObjectURL(previewUrl);
-      previewUrl = null;
-    }
+    for (const url of previewUrls) URL.revokeObjectURL(url);
+    previewUrls.clear();
     selectedFilesList.replaceChildren();
 
     selectedFiles.forEach((entry, index) => {
@@ -283,8 +320,9 @@
       row.className = "file-row";
       openButton.className = "file-open";
       openButton.type = "button";
-      openButton.setAttribute("aria-expanded", String(openEntry === entry));
-      if (openEntry === entry) openButton.setAttribute("aria-controls", panelId);
+      const isOpen = reviewAll || openEntry === entry;
+      openButton.setAttribute("aria-expanded", String(isOpen));
+      if (isOpen) openButton.setAttribute("aria-controls", panelId);
       name.className = "file-name";
       name.textContent = entry.destinationName || entry.file.name;
       size.className = "file-size";
@@ -293,18 +331,24 @@
       action.textContent = entry.state === "sending" || entry.state === "saved"
         ? "View file" : "View and rename";
       openButton.addEventListener("click", () => {
-        openEntry = openEntry === entry ? null : entry;
+        if (reviewAll) {
+          reviewAll = false;
+          openEntry = entry;
+        } else {
+          openEntry = openEntry === entry ? null : entry;
+        }
         renderSelectedFiles();
         selectedFilesList.querySelectorAll(".file-open")[index].focus();
       });
       removeButton.className = "remove-file";
       removeButton.type = "button";
       removeButton.textContent = "Remove";
-      removeButton.disabled = entry.state === "sending";
+      removeButton.disabled = batchSending || entry.state === "sending";
       removeButton.setAttribute("aria-label", `Remove ${entry.file.name}`);
       removeButton.addEventListener("click", () => {
         if (openEntry === entry) openEntry = null;
         selectedFiles.splice(index, 1);
+        clearBatchFeedback();
         renderSelectedFiles();
       });
 
@@ -336,7 +380,7 @@
       sendButton.textContent = entry.state === "saved" ? "Saved"
         : entry.state === "sending" ? "Sending…"
           : entry.state === "failed" ? "Retry" : "Send";
-      sendButton.disabled = entry.state === "sending" || entry.state === "saved"
+      sendButton.disabled = accessRejected || batchSending || entry.state === "sending" || entry.state === "saved"
         || uploadValidationError(entry) !== "";
       sendButton.setAttribute("aria-label", `${sendButton.textContent} ${entry.destinationName}`);
       sendButton.addEventListener("click", () => sendFile(entry));
@@ -351,7 +395,7 @@
         item.append(sizeError);
       }
 
-      if (openEntry === entry) {
+      if (isOpen) {
         const panel = document.createElement("div");
         const originalName = document.createElement("p");
         const label = document.createElement("label");
@@ -398,9 +442,12 @@
           entry.destinationName = nameInput.value + entry.extension;
           name.textContent = entry.destinationName || entry.file.name;
           updateNameFeedback();
-          sendButton.disabled = entry.state === "sending" || entry.state === "saved"
+          sendButton.disabled = accessRejected || batchSending || entry.state === "sending" || entry.state === "saved"
             || uploadValidationError(entry) !== "";
           sendButton.setAttribute("aria-label", `${sendButton.textContent} ${entry.destinationName}`);
+          sendAllButton.disabled = accessRejected || batchSending || !selectedFiles.some((file) => file.state === "pending")
+            || selectedFiles.some((file) => file.state === "sending")
+            || selectedFiles.some((file) => file.state === "pending" && uploadValidationError(file) !== "");
         });
 
         nameField.append(nameInput, extension);
@@ -416,12 +463,53 @@
     selectionSummary.textContent = fileCount === 0
       ? "No files selected"
       : `${fileCount} ${fileCount === 1 ? "file" : "files"} · ${formatSize(totalBytes)} total`;
+    selectionActions.hidden = fileCount === 0;
+    batchStatus.hidden = fileCount === 0;
+    batchProgressWrap.hidden = fileCount === 0 || batchEntries === null;
+    reviewAllButton.disabled = fileCount === 0;
+    reviewAllButton.textContent = reviewAll ? "Hide details" : "Review all files";
+    const pending = selectedFiles.filter((entry) => entry.state === "pending");
+    sendAllButton.disabled = accessRejected || batchSending || pending.length === 0
+      || selectedFiles.some((entry) => entry.state === "sending")
+      || pending.some((entry) => uploadValidationError(entry) !== "");
+    sendAllButton.textContent = batchSending ? "Sending…" : "Send all";
   }
 
+  reviewAllButton.addEventListener("click", () => {
+    reviewAll = !reviewAll;
+    openEntry = null;
+    renderSelectedFiles();
+  });
+  sendAllButton.addEventListener("click", async () => {
+    if (accessRejected || batchSending || selectedFiles.some((entry) => entry.state === "sending")) return;
+    const pending = selectedFiles.filter((entry) => entry.state === "pending");
+    if (pending.length === 0 || pending.some((entry) => uploadValidationError(entry))) return;
+    batchSending = true;
+    batchEntries = pending;
+    for (const entry of pending) entry.bytesSent = 0;
+    chooseFilesButton.disabled = true;
+    batchStatus.textContent = `Sending 0 of ${pending.length} files. Keep this page open.`;
+    renderSelectedFiles();
+    updateBatchProgress();
+    for (const [index, entry] of pending.entries()) {
+      if (accessRejected) break;
+      batchStatus.textContent = `Sending ${index + 1} of ${pending.length} files. Keep this page open.`;
+      await sendFile(entry, true);
+    }
+    batchSending = false;
+    chooseFilesButton.disabled = maxFileBytes === null || accessRejected;
+    const saved = pending.filter((entry) => entry.state === "saved").length;
+    batchStatus.textContent = accessRejected
+      ? "Transfer link expired. Open the current QR link to send the remaining files."
+      : `${saved} of ${pending.length} files saved. Check each file's result below.`;
+    renderSelectedFiles();
+    updateBatchProgress();
+  });
   chooseFilesButton.addEventListener("click", () => fileInput.click());
   retrySettingsButton.addEventListener("click", loadTransferSettings);
   fileInput.addEventListener("change", () => {
     if (fileInput.files.length === 0) return;
+    clearBatchFeedback();
     selectedFiles.push(...Array.from(fileInput.files, (file) => ({
       file,
       destinationName: file.name,

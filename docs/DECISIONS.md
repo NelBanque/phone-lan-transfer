@@ -10,6 +10,13 @@ independently. JavaScript uses `TextEncoder` after rejecting unpaired Unicode
 surrogates, which the encoder would otherwise replace silently.
 
 The browser sends one raw `File` per explicit Send action using `XMLHttpRequest`.
+Send all queues pending files sequentially through the same path, preserving
+individual progress and results. Failed files are not retried automatically;
+an expired token stops the queue. Review all files exposes previews and name
+fields together, while the compact list remains available for long selections.
+The batch progress bar sums browser-reported bytes across queued files, so
+larger files contribute proportionally. It describes bytes sent, not confirmed
+saves; the final per-file results remain authoritative.
 Each entry has pending, sending, saved, and failed states and manual retry.
 Names are locked while sending and after saving; in-flight entries cannot be
 removed. Saved requires HTTP 201 and the expected confirmation body. A lost or

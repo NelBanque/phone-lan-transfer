@@ -184,7 +184,13 @@ h1 {
   cursor: pointer;
 }
 
-.choose-files:hover:not(:disabled) {
+@media (hover: hover) and (pointer: fine) {
+  .choose-files:hover:not(:disabled) {
+    background: var(--brand-dark);
+  }
+}
+
+.choose-files:active:not(:disabled) {
   background: var(--brand-dark);
 }
 
@@ -231,6 +237,76 @@ h1 {
   margin: 0.8rem 0 0;
   padding: 0;
   list-style: none;
+}
+
+.selection-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.9rem;
+}
+
+.selection-actions[hidden] {
+  display: none;
+}
+
+.selection-actions button {
+  min-height: 2.75rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--brand);
+  border-radius: 0.6rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+#review-all {
+  color: var(--brand);
+  background: white;
+}
+
+#send-all {
+  color: white;
+  background: var(--brand);
+}
+
+.selection-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.selection-actions button:focus-visible {
+  outline: 3px solid var(--brand-dark);
+  outline-offset: 3px;
+}
+
+#batch-status {
+  margin: 0.6rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.batch-progress-wrap {
+  margin-top: 0.8rem;
+}
+
+.batch-progress-wrap[hidden] {
+  display: none;
+}
+
+#batch-progress {
+  width: 100%;
+  height: 0.75rem;
+  accent-color: var(--brand);
+}
+
+#batch-percent {
+  margin: 0.2rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+#batch-status:empty {
+  display: none;
 }
 
 .selected-file {

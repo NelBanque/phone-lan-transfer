@@ -50,6 +50,15 @@
             <h2 id="selected-title">Selected files</h2>
             <p id="selection-summary" role="status">No files selected</p>
           </div>
+          <div class="selection-actions" id="selection-actions" hidden>
+            <button id="review-all" type="button" disabled>Review all files</button>
+            <button id="send-all" type="button" disabled>Send all</button>
+          </div>
+          <div id="batch-progress-wrap" class="batch-progress-wrap" hidden>
+            <progress id="batch-progress" max="100" value="0" aria-label="Total upload progress"></progress>
+            <p id="batch-percent" role="status">Total sent: 0%</p>
+          </div>
+          <p id="batch-status" role="status"></p>
           <ul id="selected-files" class="selected-files"></ul>
         </section>
 

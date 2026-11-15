@@ -5,6 +5,7 @@ const { runInNewContext } = require("node:vm");
 const { resolve } = require("node:path");
 
 const script = readFileSync(resolve(__dirname, "../src/phone_lan_transfer/static/app.js"), "utf8");
+const markup = readFileSync(resolve(__dirname, "../src/phone_lan_transfer/static/index.html"), "utf8");
 
 function element() {
   return {
@@ -69,6 +70,96 @@ async function page(fetchResponse, hash = "#token=test-token", sessionStorage = 
 }
 
 const settings = (limit) => ({ status: 200, ok: true, json: async () => ({ max_file_bytes: limit }) });
+
+test("batch controls sit above the list and appear only with selected files", async () => {
+  assert.ok(markup.indexOf('id="selection-actions"') < markup.indexOf('id="selected-files"'));
+  const { nodes } = await page(() => settings(100));
+  const actions = nodes.get("#selection-actions");
+  assert.equal(actions.hidden, true);
+  const list = pick(nodes, [{ name: "one.txt", size: 1 }]);
+  assert.equal(actions.hidden, false);
+  list.querySelectorAll(".remove-file")[0].listeners.click();
+  assert.equal(actions.hidden, true);
+});
+
+test("Send all waits for each result, keeps failures separate, and does not retry them", async () => {
+  let finishFirst;
+  const first = new Promise((resolve) => { finishFirst = resolve; });
+  const { nodes, calls } = await page((url) => {
+    if (url === "/transfer-settings") return settings(100);
+    return calls.length === 2 ? first : { status: 409, ok: false };
+  });
+  const list = pick(nodes, [{ name: "one.txt", size: 1 }, { name: "two.txt", size: 1 }]);
+  const sendAll = nodes.get("#send-all");
+  const sending = sendAll.listeners.click();
+  assert.equal(calls.length, 2, "only the first upload starts immediately");
+  await sendAll.listeners.click();
+  assert.equal(calls.length, 2, "a second tap cannot start another batch");
+  finishFirst({ status: 201, ok: true, json: async () => ({ status: "saved", destination_name: "one.txt" }) });
+  await sending;
+  assert.equal(calls.length, 3);
+  assert.equal(list.querySelectorAll(".send-file")[0].textContent, "Saved");
+  assert.equal(list.querySelectorAll(".send-file")[1].textContent, "Retry");
+  assert.match(nodes.get("#batch-status").textContent, /1 of 2 files saved/);
+  assert.equal(sendAll.disabled, true, "failed files require a deliberate individual retry");
+});
+
+test("total progress weighs file bytes and waits for the last save confirmation", async () => {
+  let finishFirst;
+  let finishSecond;
+  const first = new Promise((resolve) => { finishFirst = resolve; });
+  const second = new Promise((resolve) => { finishSecond = resolve; });
+  const { nodes, calls, uploads } = await page((url) => {
+    if (url === "/transfer-settings") return settings(100);
+    return calls.length === 2 ? first : second;
+  });
+  pick(nodes, [{ name: "photo.jpg", size: 20 }, { name: "video.mov", size: 80 }]);
+  const sending = nodes.get("#send-all").listeners.click();
+  const total = nodes.get("#batch-progress");
+  assert.equal(total.value, 0);
+  uploads[0].upload.listeners.progress({ lengthComputable: true, loaded: 10, total: 20 });
+  assert.equal(total.value, 10);
+  uploads[0].upload.listeners.load();
+  assert.equal(total.value, 20);
+  finishFirst({ status: 201, json: async () => ({ status: "saved", destination_name: "photo.jpg" }) });
+  await new Promise(setImmediate);
+  uploads[1].upload.listeners.progress({ lengthComputable: true, loaded: 40, total: 80 });
+  assert.equal(total.value, 60);
+  uploads[1].upload.listeners.load();
+  assert.equal(total.value, 100);
+  assert.match(nodes.get("#batch-percent").textContent, /Waiting/);
+  finishSecond({ status: 201, json: async () => ({ status: "saved", destination_name: "video.mov" }) });
+  await sending;
+  assert.equal(total.value, 100);
+  assert.match(nodes.get("#batch-status").textContent, /2 of 2 files saved/);
+});
+
+test("Send all stops after an expired link and leaves later files pending", async () => {
+  const { nodes, calls } = await page((url) => url === "/transfer-settings"
+    ? settings(100) : { status: 401, ok: false });
+  const list = pick(nodes, [{ name: "one.txt", size: 1 }, { name: "two.txt", size: 1 }]);
+  await nodes.get("#send-all").listeners.click();
+  assert.equal(calls.length, 2);
+  assert.equal(list.querySelectorAll(".send-file")[0].textContent, "Retry");
+  assert.equal(list.querySelectorAll(".send-file")[1].textContent, "Send");
+  assert.equal(nodes.get("#send-all").disabled, true);
+  assert.match(nodes.get("#batch-status").textContent, /current QR/);
+});
+
+test("Review all exposes every rename field and can hide them again", async () => {
+  const { nodes } = await page(() => settings(100));
+  const list = pick(nodes, [{ name: "photo.jpg", size: 1, type: "text/plain" }, { name: "video.mov", size: 1, type: "text/plain" }]);
+  const reviewAll = nodes.get("#review-all");
+  await reviewAll.listeners.click();
+  assert.equal(list.querySelectorAll(".rename-input").length, 2);
+  const editor = list.querySelectorAll(".rename-input")[1];
+  editor.value = "holiday";
+  editor.listeners.input();
+  assert.equal(list.querySelectorAll(".file-name")[1].textContent, "holiday.mov");
+  await reviewAll.listeners.click();
+  assert.equal(list.querySelectorAll(".rename-input").length, 0);
+  assert.equal(list.querySelectorAll(".file-name")[1].textContent, "holiday.mov");
+});
 
 function tokenStorage() {
   const values = new Map();

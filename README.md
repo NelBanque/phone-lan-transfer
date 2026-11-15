@@ -120,10 +120,16 @@ tokens. Selected files are not restored after reload. If browser storage is
 blocked, the QR works for the current page, but reload requires reopening it.
 Storage remains accessible to scripts on the same origin. Browser session
 restoration or tab duplication may retain it; closing a tab is not revocation.
-Use each file's Send button to transfer it. The progress bar reports bytes
-sent by the browser, with a percentage when the total is known. At 100%,
-the page still waits for the computer's save confirmation. File bytes are
-transferred directly without image conversion or recompression.
+Use Send all to transfer pending files in order, or each file's Send button to
+transfer it separately. Review all files opens their previews and destination
+name fields together; Hide details returns to the compact list. Send all waits
+for each file's save result before starting the next. Failed files keep their
+own errors and require an individual retry after checking the receiving folder.
+While Send all runs, a total progress bar weighs each file by its byte size.
+Its percentage measures bytes sent, so 100% still waits for the computer's
+save confirmation and is not a claim that every file was saved. Each file also
+shows its own progress. File bytes are transferred directly without image
+conversion or recompression.
 Names cannot be edited while
 sending or after a confirmed save. Failed files offer Retry; existing names
 require correction. If a save cannot be confirmed after a connection failure,
