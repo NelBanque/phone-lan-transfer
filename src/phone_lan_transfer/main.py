@@ -39,6 +39,11 @@ def create_app(
         """Report that the local server is running."""
         return {"status": "ok"}
 
+    @application.get("/favicon.ico", include_in_schema=False)
+    def favicon() -> FileResponse:
+        """Serve the brand icon for browsers requesting the conventional path."""
+        return FileResponse(STATIC_DIRECTORY / "favicon.ico", media_type="image/x-icon")
+
     @application.get(
         "/transfer-settings", dependencies=[Depends(require_access_token)]
     )

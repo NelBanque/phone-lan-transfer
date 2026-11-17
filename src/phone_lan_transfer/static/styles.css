@@ -214,7 +214,7 @@ h1 {
 .selection-heading {
   display: flex;
   gap: 0.3rem 1rem;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
 }
@@ -225,6 +225,7 @@ h1 {
 }
 
 .selection-heading p {
+  margin-top: 0.25rem;
   margin-bottom: 0;
   color: var(--text-muted);
   font-size: 0.85rem;
@@ -262,6 +263,39 @@ h1 {
 #review-all {
   color: var(--brand);
   background: white;
+}
+
+#clear-saved {
+  flex: 0 0 auto;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.9rem;
+  color: var(--brand-dark);
+  background: #eef1f5;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #clear-saved:hover:not(:disabled) {
+    background: #e3e8ef;
+  }
+}
+
+#clear-saved:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#clear-saved:focus-visible {
+  outline: 3px solid var(--brand-dark);
+  outline-offset: 3px;
+}
+
+#clear-saved[hidden] {
+  display: none;
 }
 
 #send-all {

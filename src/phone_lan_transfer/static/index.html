@@ -6,6 +6,8 @@
     <meta name="theme-color" content="#f4f7fb">
     <meta name="description" content="Transfer files to your computer over your local network.">
     <title>Phone LAN Transfer</title>
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48 64x64 128x128 256x256">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" sizes="any">
     <link rel="stylesheet" href="/static/styles.css">
     <script src="/static/app.js" defer></script>
   </head>
@@ -47,8 +49,11 @@
 
         <section class="selection-results" aria-labelledby="selected-title">
           <div class="selection-heading">
-            <h2 id="selected-title">Selected files</h2>
-            <p id="selection-summary" role="status">No files selected</p>
+            <div>
+              <h2 id="selected-title">Selected files</h2>
+              <p id="selection-summary" role="status">No files selected</p>
+            </div>
+            <button id="clear-saved" type="button" title="Remove saved items from this list; keep the files on the computer" hidden>Clear saved</button>
           </div>
           <div class="selection-actions" id="selection-actions" hidden>
             <button id="review-all" type="button" disabled>Review all files</button>

@@ -25,7 +25,7 @@ function element() {
   };
 }
 
-async function page(fetchResponse, hash = "#token=test-token", sessionStorage = tokenStorage()) {
+async function page(fetchResponse, hash = "#token=test-token", sessionStorage = tokenStorage(), timers = { setTimeout, clearTimeout }) {
   const nodes = new Map();
   const calls = [];
   const uploads = [];
@@ -39,6 +39,7 @@ async function page(fetchResponse, hash = "#token=test-token", sessionStorage = 
     addEventListener(event, handler) { this.listeners[event] = handler; }
     open(method, url) { this.method = method; this.url = url; }
     setRequestHeader(name, value) { this.headers[name] = value; }
+    abort() { this.aborted = true; this.listeners.abort(); }
     send(body) {
       calls.push([this.url, { method: this.method, headers: this.headers, body }]);
       Promise.resolve().then(() => fetchResponse(this.url)).then(async (response) => {
@@ -60,7 +61,7 @@ async function page(fetchResponse, hash = "#token=test-token", sessionStorage = 
     window: {
       sessionStorage,
       location: { hash, pathname: "/", search: "" },
-      history: { replaceState() {} }, setTimeout, clearTimeout,
+      history: { replaceState() {} }, setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout,
     },
     URLSearchParams, AbortController, Intl, TextEncoder, XMLHttpRequest: MockXMLHttpRequest,
     fetch: async (...args) => { calls.push(args); return fetchResponse(...args); },
@@ -70,6 +71,167 @@ async function page(fetchResponse, hash = "#token=test-token", sessionStorage = 
 }
 
 const settings = (limit) => ({ status: 200, ok: true, json: async () => ({ max_file_bytes: limit }) });
+
+test("Clear saved removes only confirmed list entries without making a server request", async () => {
+  const { nodes, calls } = await page((url) => {
+    if (url === "/transfer-settings") return settings(100);
+    const name = new URL(url, "http://localhost").searchParams.get("destination_name");
+    return name === "failed.txt" ? { status: 409 }
+      : { status: 201, json: async () => ({ status: "saved", destination_name: name }) };
+  });
+  const list = pick(nodes, [
+    { name: "saved.txt", size: 1 }, { name: "failed.txt", size: 1 }, { name: "pending.txt", size: 1 },
+  ]);
+  assert.equal(nodes.get("#clear-saved").hidden, true);
+  await list.querySelectorAll(".send-file")[0].listeners.click();
+  await list.querySelectorAll(".send-file")[1].listeners.click();
+  assert.equal(nodes.get("#clear-saved").hidden, false);
+  const before = calls.length;
+  nodes.get("#clear-saved").listeners.click();
+  assert.equal(calls.length, before);
+  assert.equal(list.children.length, 2);
+  assert.equal(list.querySelectorAll(".send-file")[0].textContent, "Retry");
+  assert.equal(list.querySelectorAll(".send-file")[1].textContent, "Send");
+  assert.equal(nodes.get("#clear-saved").hidden, true);
+  list.querySelectorAll(".remove-file")[0].listeners.click();
+  await list.querySelectorAll(".send-file")[0].listeners.click();
+  nodes.get("#clear-saved").listeners.click();
+  assert.equal(list.children.length, 0);
+  assert.equal(nodes.get("#selection-summary").textContent, "No files selected");
+});
+
+test("batch bar disappears at 100 while confirmation remains explicit, and resets for the next batch", async () => {
+  let finish;
+  const { nodes, uploads } = await page((url) => url === "/transfer-settings"
+    ? settings(100) : new Promise((resolve) => { finish = resolve; }));
+  const list = pick(nodes, [{ name: "first.txt", size: 100 }]);
+  const sending = nodes.get("#send-all").listeners.click();
+  await new Promise(setImmediate);
+  const wrap = nodes.get("#batch-progress-wrap");
+  assert.equal(wrap.hidden, false);
+  uploads[0].upload.listeners.progress({ lengthComputable: true, loaded: 50, total: 100 });
+  assert.equal(wrap.hidden, false);
+  uploads[0].upload.listeners.load();
+  assert.equal(wrap.hidden, true);
+  assert.match(nodes.get("#batch-status").textContent, /Waiting.*confirm/);
+  assert.notEqual(list.querySelectorAll(".send-file")[0].textContent, "Saved");
+  finish({ status: 201, json: async () => ({ status: "saved", destination_name: "first.txt" }) });
+  await sending;
+  assert.equal(wrap.hidden, true);
+  assert.match(nodes.get("#batch-status").textContent, /1 of 1 files saved/);
+  pick(nodes, [{ name: "next.txt", size: 100 }]);
+  const next = nodes.get("#send-all").listeners.click();
+  assert.equal(wrap.hidden, false);
+  assert.equal(nodes.get("#batch-progress").value, 0);
+  // Clearing must be disabled and guarded while another file is sending.
+  assert.equal(nodes.get("#clear-saved").disabled, true);
+  nodes.get("#clear-saved").listeners.click();
+  assert.equal(list.children.length, 2);
+  uploads[1].listeners.error();
+  await next;
+  assert.equal(wrap.hidden, true);
+});
+
+function fakeClock() {
+  let now = 0;
+  let nextId = 0;
+  const scheduled = new Map();
+  return {
+    setTimeout(callback, delay) {
+      const id = ++nextId;
+      scheduled.set(id, { at: now + delay, callback });
+      return id;
+    },
+    clearTimeout(id) { scheduled.delete(id); },
+    advance(milliseconds) {
+      const until = now + milliseconds;
+      while (true) {
+        const next = [...scheduled].sort((a, b) => a[1].at - b[1].at)[0];
+        if (!next || next[1].at > until) break;
+        now = next[1].at;
+        scheduled.delete(next[0]);
+        next[1].callback();
+      }
+      now = until;
+    },
+    get pending() { return scheduled.size; },
+  };
+}
+
+test("an inactive upload is aborted, pauses the batch, and ignores a late save response", async () => {
+  const clock = fakeClock();
+  let finish;
+  const { nodes, uploads, calls } = await page((url) => url === "/transfer-settings"
+    ? settings(100) : new Promise((resolve) => { finish = resolve; }), "#token=test", tokenStorage(), clock);
+  const list = pick(nodes, [{ name: "first.txt", size: 10 }, { name: "next.txt", size: 10 }]);
+  const sending = nodes.get("#send-all").listeners.click();
+  clock.advance(119999);
+  assert.equal(uploads[0].aborted, undefined);
+  clock.advance(1);
+  await sending;
+  assert.equal(uploads[0].aborted, true);
+  assert.equal(calls.length, 2, "later files must stay pending after a broken connection");
+  assert.match(list.querySelectorAll(".transfer-status")[0].textContent, /may already be/);
+  assert.match(list.querySelectorAll(".transfer-status")[1].textContent, /Pending/);
+  assert.equal(nodes.get("#send-all").disabled, false);
+  assert.equal(nodes.get("#choose-files").disabled, false);
+  assert.equal(clock.pending, 0);
+  finish({ status: 201, json: async () => ({ status: "saved", destination_name: "first.txt" }) });
+  await new Promise(setImmediate);
+  assert.equal(list.querySelectorAll(".send-file")[0].textContent, "Retry");
+});
+
+test("real byte progress renews inactivity without a total duration limit; duplicate progress does not", async () => {
+  const clock = fakeClock();
+  const { nodes, uploads } = await page((url) => url === "/transfer-settings"
+    ? settings(100) : new Promise(() => {}), "#token=test", tokenStorage(), clock);
+  const list = pick(nodes, [{ name: "large.txt", size: 100 }]);
+  const sending = list.querySelectorAll(".send-file")[0].listeners.click();
+  for (const loaded of [10, 20, 30, 40]) {
+    clock.advance(90000);
+    uploads[0].upload.listeners.progress({ lengthComputable: true, loaded, total: 100 });
+    assert.equal(uploads[0].aborted, undefined);
+  }
+  clock.advance(90000);
+  uploads[0].upload.listeners.progress({ lengthComputable: true, loaded: 40, total: 100 });
+  clock.advance(30000);
+  await sending;
+  assert.equal(uploads[0].aborted, true);
+  assert.equal(clock.pending, 0);
+});
+
+test("waiting after 100 percent is bounded and late progress cannot extend the confirmation wait", async () => {
+  const clock = fakeClock();
+  const { nodes, uploads } = await page((url) => url === "/transfer-settings"
+    ? settings(100) : new Promise(() => {}), "#token=test", tokenStorage(), clock);
+  const list = pick(nodes, [{ name: "test.txt", size: 100 }]);
+  const sending = list.querySelectorAll(".send-file")[0].listeners.click();
+  clock.advance(90000);
+  uploads[0].upload.listeners.load();
+  clock.advance(90000);
+  uploads[0].upload.listeners.progress({ lengthComputable: true, loaded: 100, total: 100 });
+  assert.match(list.querySelectorAll(".transfer-status")[0].textContent, /Waiting/);
+  clock.advance(30000);
+  await sending;
+  assert.equal(uploads[0].aborted, true);
+  assert.match(list.querySelectorAll(".transfer-status")[0].textContent, /may already be/);
+  assert.equal(clock.pending, 0);
+});
+
+test("successful and rejected responses clear inactivity timers", async () => {
+  for (const status of [201, 409]) {
+    const clock = fakeClock();
+    const { nodes, uploads } = await page((url) => url === "/transfer-settings"
+      ? settings(100) : { status, json: async () => ({ status: "saved", destination_name: "test.txt" }) },
+    "#token=test", tokenStorage(), clock);
+    const list = pick(nodes, [{ name: "test.txt", size: 1 }]);
+    await list.querySelectorAll(".send-file")[0].listeners.click();
+    assert.equal(clock.pending, 0);
+    clock.advance(240000);
+    assert.equal(uploads[0].aborted, undefined);
+    assert.equal(list.querySelectorAll(".send-file")[0].textContent, status === 201 ? "Saved" : "Retry");
+  }
+});
 
 test("batch controls sit above the list and appear only with selected files", async () => {
   assert.ok(markup.indexOf('id="selection-actions"') < markup.indexOf('id="selected-files"'));

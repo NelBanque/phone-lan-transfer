@@ -7,16 +7,16 @@ use. It must not be exposed to the internet.
 
 ## Main protections
 
-- A new random access token will be created each time the server starts.
+- A new random access token is created each time the server starts.
 - CLI startup enables LAN access and clearly reports it; `--local-only` disables it.
-- Protected requests will require the temporary token.
-- Uploads will use size limits, safe filenames, unique destinations, and
+- Protected requests require the temporary token.
+- Uploads use size limits, safe filenames, exclusive file creation, and
   streaming writes.
-- Stopping the server will invalidate the token and end the transfer session.
+- Stopping the server ends the transfer session; restarting generates a new token.
 
 ## Important limitation
 
-The first version will use HTTP, so network traffic will not be encrypted. Use
+The current version uses HTTP, so network traffic is not encrypted. Use
 the application only on a personal or trusted Wi-Fi network protected with a
 modern security mode, such as WPA2 or WPA3, and only with devices you trust.
 Avoid public, guest, hotel, university, or other shared networks.
@@ -29,7 +29,7 @@ Avoid public, guest, hotel, university, or other shared networks.
 4. Stop the server when the transfer is complete.
 5. Never configure router port forwarding or a public tunnel for this service.
 6. Open transferred files only when you trust their source. The application
-   will store general file types but will not prove that their contents are safe.
+   stores general file types but does not prove that their contents are safe.
 
 More detailed engineering trade-offs are recorded in `docs/DECISIONS.md` as
 they are implemented and tested.

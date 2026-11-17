@@ -2,6 +2,34 @@
 
 This log records decisions made during the project. Entries describe the current direction and may be revised when testing reveals a better approach.
 
+Clear saved removes only confirmed entries from the browser list, with no
+receiving-computer deletion. It is unavailable while any transfer is active.
+The batch bar disappears at 100% sent; a separate text status continues waiting
+for the actual save confirmation. This keeps completed progress out of the way
+without treating uploaded bytes as confirmed saves. The brand icon is served
+as both SVG and a multi-size ICO, including the conventional `/favicon.ico`
+route requested automatically by browsers.
+
+CLI startup now creates the destination and checks a temporary one-byte write,
+flush, and removal before printing the QR. The alternative was discovering an
+unusable folder only on the first phone upload. This creates the folder earlier
+but provides immediate local feedback. It does not reserve disk space or remove
+the need for upload-time error handling. Constructing an app alone still does
+not write to the destination.
+
+Uploads abort after two minutes without increasing byte progress, followed by
+a separate two-minute confirmation deadline after the upload body completes.
+A fixed total request timeout would reject large files on slower networks.
+Inactivity and connection failures pause the batch, preserving later pending
+files and manual retries. Saving remains uncertain on a lost confirmation.
+Browser suspension can delay the watchdog; it is not a server-side timeout.
+
+The user-tool installer exports runtime constraints from `uv.lock` with
+`uv export --locked` and installs the checkout in editable mode using them.
+This avoids resolving newer dependencies than those used for development tests.
+It requires keeping a checkout instead of a single Git URL installation. The
+installer does not modify the lockfile; rerun it after lockfile or path changes.
+
 Browser destination-name feedback now follows the server's 255-byte UTF-8
 limit, including the extension, and its reserved-name, whitespace, control
 character, and Unicode rules. Specific messages let users correct a name
@@ -12,7 +40,7 @@ surrogates, which the encoder would otherwise replace silently.
 The browser sends one raw `File` per explicit Send action using `XMLHttpRequest`.
 Send all queues pending files sequentially through the same path, preserving
 individual progress and results. Failed files are not retried automatically;
-an expired token stops the queue. Review all files exposes previews and name
+an expired token or uncertain connection pauses the queue. Review all files exposes previews and name
 fields together, while the compact list remains available for long selections.
 The batch progress bar sums browser-reported bytes across queued files, so
 larger files contribute proportionally. It describes bytes sent, not confirmed
@@ -63,5 +91,5 @@ platform-specific directory discovery code in the application.
 | Give each selected file its own upload result and a way to correct or retry failures. | A person needs to know which file was saved and which failed because of its name, size, network connection, destination collision, or another error. | Show only one success or failure message for the whole selection. | The browser and server need explicit per-file states and error responses; the interface must not claim success before the server confirms a save. |
 | Start uploads with a configurable 5 GiB per-file limit, enforced by the receiving server while streaming. | A useful default accommodates many videos, while each user can raise it at startup without editing source code. | Use a small fixed limit or accept files of any size. | Very large videos may still require a higher setting; the server must clean up partial files and report size or storage failures for the affected file. The authenticated upload endpoint now enforces this limit while streaming; the browser displays the active limit and supports individual sends. |
 | Save received chunks with exclusive file creation and remove the new file when a handled transfer error occurs. | Exclusive creation prevents overwriting an existing name on different desktop file systems without needing a second full-size copy. | Write to a temporary file and publish it with a hard link. | A partial file is visible during transfer and can remain after an abrupt process or power failure; hard links are unavailable on some removable-drive file systems. The authenticated upload endpoint now calls this storage function. |
-| Configure the destination folder and positive per-file byte limit at startup, keeping immutable settings on the application. | Each server run can use a different receiving folder and limit without editing source code; relative paths resolve against the startup directory. | Hard-code settings or read them independently inside each endpoint. | Integer byte values are less convenient than unit suffixes. Configuration alone does not create or verify the folder; the upload endpoint uses these settings and the browser queries and displays the active limit. |
+| Configure the destination folder and positive per-file byte limit at startup, keeping immutable settings on the application. | Each server run can use a different receiving folder and limit without editing source code; relative paths resolve against the startup directory. | Hard-code settings or read them independently inside each endpoint. | CLI startup now verifies a temporary write. App construction alone does not create the folder; the upload endpoint enforces limits and still handles storage failures. |
 | Receive one file per authenticated POST as a raw streamed HTTP body, with the destination name in a query parameter. | The existing storage function can enforce the configured limit and clean up partial files while receiving, without a full multipart spool copy. A worker thread handles blocking disk writes while AnyIO bridges network reads. | Use multipart UploadFile or load the full body into memory. | The browser must send a raw File body and URL-encode its proposed name. AnyIO is a direct dependency. Success is returned after writing and closing, not a guarantee against power loss; browser sending is implemented, and the recorded phone integrity check is scoped in docs/TESTING.md. |

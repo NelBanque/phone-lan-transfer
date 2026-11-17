@@ -3,6 +3,7 @@
 import os
 from collections.abc import Iterable
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 from phone_lan_transfer.filenames import validate_destination_name
 
@@ -11,6 +12,16 @@ DEFAULT_MAX_FILE_BYTES = 5 * 1024**3
 
 class FileTooLargeError(ValueError):
     """The incoming file exceeded the configured byte limit."""
+
+
+def prepare_destination(destination_directory: Path) -> None:
+    """Create the receiving folder and verify a temporary write at CLI startup."""
+    destination_directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with NamedTemporaryFile(
+        mode="wb", prefix=".phonelt-check-", dir=destination_directory
+    ) as probe:
+        probe.write(b"\0")
+        probe.flush()
 
 
 def save_file(

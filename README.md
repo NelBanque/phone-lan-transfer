@@ -2,29 +2,37 @@
 
 Transfer files from a mobile device directly to a computer over a local network, without installing a mobile app.
 
+## Demo
+
+Review and rename files on an iPhone, send them together, and find them on Windows.
+
+[![Animated demo: iPhone file review, Send all, save confirmations, and received files on Windows](docs/media/phone-lan-transfer-demo.gif)](docs/media/phone-lan-transfer-demo.mp4)
+
+[Watch the complete 59-second Full HD video](docs/media/phone-lan-transfer-demo.mp4) ·
+[Still preview](docs/media/phone-lan-transfer-demo-poster.png)
+
+Both screen recordings are shown in full, synchronized side by side. Opening
+pauses leave time to read the typed `phonelt` command; the recordings otherwise
+play at their original speed. No audio. This review version is unredacted.
+QR access expires when its server session stops.
+
 ## Why I built this
 
 I have often needed a simple way to move photos, videos, and other files from my iPhone to my computer. Instead of only looking for an existing tool, I decided to build one myself. The project now targets modern mobile browsers and desktop operating systems while keeping iPhone with Safari to Windows as the first reference combination. This gives me a practical problem through which to learn software engineering: breaking a task into small parts, evaluating technical choices, and understanding the solution well enough to explain and improve it.
 
-> **Project status:** Early development. The local server, temporary access
-> token, LAN reception, terminal QR code, and responsive browser page are
-> implemented. The browser can select, preview supported media, rename pending
-> files, and remove them. An authenticated streaming upload endpoint is
-> implemented and tested. The browser can send individual files and show
-> confirmed saves, errors, and manual retries. A first manual phone-to-Windows
-> transfer succeeded. Per-file upload progress and reload access recovery are
-> implemented and manually reviewed. A recorded iPhone-to-Windows ZIP transfer
-> passed size and SHA-256 verification; broader compatibility testing remains pending.
-
-## Demo
-
-_A short GIF showing the QR code, mobile upload page, and saved files will be added after the MVP is working._
+> **Project status:** Working development version. Individual and sequential
+> batch uploads, previews, destination names, upload progress, manual retries,
+> and reload access recovery are implemented. Recorded ZIP transfers passed
+> size and SHA-256 verification on iPhone/Safari to Windows and Android/Chrome
+> to macOS. See [manual verification](docs/TESTING.md) for the exact scope;
+> broader compatibility and standalone desktop packages remain future work.
 
 ## Implemented features
 
 - A local web server on the computer and a QR code that opens the upload page in a mobile browser.
 - A fresh access token each time the server starts.
-- Multiple-file selection with individual Send actions, progress, errors, and retries.
+- Multiple-file selection, previews, destination-name editing, and Review all files.
+- Individual Send actions or sequential Send all, per-file and total progress, errors, and manual retries.
 - Streaming writes, validated filenames, collision rejection, and a configurable file size limit.
 - Command-line options for the port and destination folder.
 
@@ -34,14 +42,20 @@ _A short GIF showing the QR code, mobile upload page, and saved files will be ad
 
 This development version requires Python 3.11+ and
 [`uv`](https://docs.astral.sh/uv/). It is not yet a standalone desktop download.
-After installing those prerequisites, install the tool from GitHub once:
+Git is also required. Clone the project once and install its command with the
+runtime dependency versions recorded in `uv.lock`:
 
 ```powershell
-uv tool install git+https://github.com/NelBanque/phone-lan-transfer.git
+git clone https://github.com/NelBanque/phone-lan-transfer.git
+cd phone-lan-transfer
+python scripts/install_tool.py
 ```
 
-This installs the version published on GitHub, not unpublished local changes.
-Git must also be available for this source installation. If the command is not
+If you already have a checkout, run only `python scripts/install_tool.py` from
+that folder. The script installs an editable user tool, so it follows the local
+source. Keep the folder in place; rerun the script after moving it or updating
+`uv.lock`. It exports constraints without changing the lockfile. If `python` is
+named `python3` on your system, use that command instead. If `phonelt` is not
 found after installation, run `uv tool update-shell` and reopen your terminal.
 
 Start reception on a trusted local network:
@@ -57,7 +71,8 @@ Wait for Saved before closing the page. Stop the server with Ctrl+C.
 
 Defaults: the system Downloads folder's `Phone LAN Transfer` subfolder,
 5 GiB per file, port 8000, and LAN access enabled. The receiving subfolder is
-created when storage first needs it. The startup summary shows its full path.
+created and checked with a temporary write before the QR is displayed. The
+startup summary shows its full path. Folder problems stop startup with guidance.
 Use `-d` if you want another location; existing files are never overwritten.
 
 ```powershell
@@ -89,8 +104,8 @@ The current development server requires Python 3.11+ and
 server with:
 
 ```bash
-uv sync
-uv run phonelt
+uv sync --locked
+uv run --locked phonelt
 ```
 
 Open <http://127.0.0.1:8000/health> to verify that the server returns
@@ -125,6 +140,10 @@ transfer it separately. Review all files opens their previews and destination
 name fields together; Hide details returns to the compact list. Send all waits
 for each file's save result before starting the next. Failed files keep their
 own errors and require an individual retry after checking the receiving folder.
+Clear saved removes confirmed entries from this list without deleting files on
+the computer. It is unavailable while sending. The total progress bar appears
+only during an active batch below 100%; at 100%, it disappears while the status
+still waits for save confirmation. The final save results remain visible.
 While Send all runs, a total progress bar weighs each file by its byte size.
 Its percentage measures bytes sent, so 100% still waits for the computer's
 save confirmation and is not a claim that every file was saved. Each file also
@@ -134,8 +153,13 @@ Names cannot be edited while
 sending or after a confirmed save. Failed files offer Retry; existing names
 require correction. If a save cannot be confirmed after a connection failure,
 check the receiving folder before retrying. A retry never overwrites an
-existing file. Do not use LAN mode on a public or
-untrusted network.
+existing file. An upload is aborted after two minutes without byte progress;
+after sending completes, save confirmation also has a two-minute deadline.
+Ongoing byte progress renews the upload timer, so a large file can take longer.
+A connection failure, inactivity expiry, or invalid save confirmation pauses
+Send all and leaves later files pending. Check the computer before retrying the
+affected file or starting the remaining files. Browser suspension may delay
+timers. Do not use LAN mode on a public or untrusted network.
 
 If automatic address detection selects the wrong interface on a computer with
 a VPN or multiple network connections, set the phone-facing IPv4 address
@@ -155,9 +179,11 @@ uv run phonelt -d "received files" -m 5
 ```
 
 The defaults are system Downloads/Phone LAN Transfer and 5 GiB per
-file. Storage receives a positive integer number of bytes. Startup does not
-create the folder or check whether it is writable. The upload endpoint uses
-these settings; the browser displays the active limit and sends individual files.
+file. Storage receives a positive integer number of bytes. CLI startup creates
+the folder and verifies a temporary write, then removes the probe. This check
+does not reserve space or guarantee that permissions and storage stay available;
+the upload endpoint still handles write failures. Creating the app directly
+does not run the CLI check. The browser displays the active limit.
 
 ### Development upload API
 
@@ -201,7 +227,7 @@ The core is designed for mobile devices with modern browsers and for Windows, ma
 
 ## Development checks
 
-Run `uv run pytest` and `uv run ruff check .` for the Python checks.
+Run `uv run --locked pytest` and `uv run --locked ruff check .` for the Python checks.
 With Node.js installed, run `node --test tests/browser-settings.test.cjs` to
 check the browser settings flow with simulated network responses and page elements.
 These checks do not replace testing in a real mobile browser.

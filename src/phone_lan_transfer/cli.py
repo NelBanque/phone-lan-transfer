@@ -13,7 +13,7 @@ from phone_lan_transfer.access import generate_access_token
 from phone_lan_transfer.config import TransferSettings, default_destination
 from phone_lan_transfer.main import create_app
 from phone_lan_transfer.network import detect_lan_ip, validate_lan_ip
-from phone_lan_transfer.storage import DEFAULT_MAX_FILE_BYTES
+from phone_lan_transfer.storage import DEFAULT_MAX_FILE_BYTES, prepare_destination
 
 DEFAULT_HOST = "127.0.0.1"
 LAN_HOST = "0.0.0.0"
@@ -144,11 +144,18 @@ def main(arguments: Sequence[str] | None = None) -> None:
         parser.error("--lan-address cannot be combined with --local-only")
 
     host = DEFAULT_HOST if options.local_only else LAN_HOST
-    access_token = generate_access_token()
     limit = options.max_gib or options.max_file_bytes or DEFAULT_MAX_FILE_BYTES
     if limit > 2**53 - 1:
         parser.error("limit must be at most 9007199254740991 bytes for browser support")
-    settings = TransferSettings(options.destination or default_destination(), limit)
+    try:
+        settings = TransferSettings(options.destination or default_destination(), limit)
+        prepare_destination(settings.destination_directory)
+    except (OSError, ValueError) as error:
+        parser.error(
+            f"Cannot prepare the receiving folder: {error}. "
+            "Choose another folder with -d, or check its permissions and free space."
+        )
+    access_token = generate_access_token()
     application = create_app(access_token=access_token, settings=settings)
 
     print("\n  PHONE LAN TRANSFER")

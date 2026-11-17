@@ -45,7 +45,11 @@ sequenceDiagram
 
 The CLI creates a fresh random token and `TransferSettings`. The default
 destination is the system Downloads folder's `Phone LAN Transfer` subfolder;
-the default per-file limit is 5 GiB. Startup does not create or verify the folder.
+the default per-file limit is 5 GiB. CLI startup creates the folder if needed
+and writes, flushes, and removes a temporary probe before displaying the QR.
+An unusable destination stops startup with an actionable error. This checks
+current access, not future free space or durability. App construction alone
+remains free of destination writes; the upload path still handles storage errors.
 
 The default listener is `0.0.0.0`; `--local-only` uses `127.0.0.1`.
 the phone uses the computer's detected LAN IPv4 address, or `--lan-address`.
@@ -89,6 +93,16 @@ wrapper, conversion, recompression, or full-file JavaScript read. A mobile picke
 may itself supply a converted file; preserving the selected bytes does not
 prove preservation of the photo-library original.
 
+Uploads have a two-minute inactivity timer, renewed only when reported byte
+counts increase. After the upload body completes, a separate two-minute wait
+for save confirmation begins. Expiry aborts the browser request and reports
+uncertain saving through the existing error path. There is no total-duration
+limit for an upload that keeps advancing. Browser suspension may delay timers.
+Request completion clears its timer, and late events cannot change the result.
+Connection failures and invalid confirmations pause Send all with later files
+pending; server rejections such as a name collision retain per-file results
+and allow the queue to continue. Failed files are never retried automatically.
+
 ### 4. Stream into storage
 
 Authentication runs before storage. The synchronous upload handler runs in an
@@ -130,5 +144,5 @@ existing names remain protected.
 Python tests cover server behavior; Node tests simulate the browser DOM and
 network. They complement real-device checks rather than establishing broad
 browser compatibility. See [manual verification](TESTING.md) for the recorded
-iPhone-to-Windows ZIP integrity test, [security guidance](SECURITY.md) for safe
+iPhone-to-Windows and Android-to-macOS ZIP integrity tests, [security guidance](SECURITY.md) for safe
 use, and [engineering decisions](DECISIONS.md) for alternatives and trade-offs.

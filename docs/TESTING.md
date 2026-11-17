@@ -1,5 +1,44 @@
 # Manual transfer verification
 
+## Closing checks: 2026-11-17
+
+The final application changes include the original interface with a gray
+Clear saved button beside the selection summary, hiding the batch bar at 100%
+while keeping save confirmation explicit, and working SVG/ICO favicons.
+Chrome checks with a deliberately delayed HTTP response verified that the bar
+disappears before confirmation, Saved appears only after the response, and
+Clear saved leaves the received disk file untouched. The current regression
+suite has 124 Python tests and 29 Node browser simulations.
+
+The README currently contains a 59-second unredacted review export of the two
+complete recordings. All 1,770 frames decode; it is Full HD at 30 fps, without
+audio. GIF timing and local media links were checked. This recording is a
+workflow demonstration; no additional byte-integrity claim is made. Further
+video review remains pending.
+
+## Local receiver and recovery checks: 2026-11-16
+
+The installed Windows user tool was reinstalled using runtime constraints
+exported from `uv.lock`. All 21 installed distributions, including the project,
+matched the tested development environment's versions.
+
+A temporary loopback-only server verified CLI help outside the checkout,
+rejection of a file used as the destination, startup folder preparation without
+leftover probe files, page/assets/settings, unauthenticated rejection, exact
+received bytes, repeated name collisions without overwrites, size-limit cleanup,
+and cleanup after a real TCP disconnect partway through a request. Health and a
+new upload succeeded afterward. The diagnostic server was stopped afterward.
+These are local receiver checks, not another phone compatibility or integrity
+claim.
+
+Browser regression simulations use a controlled clock to cover inactivity
+abort, long-running uploads with continuing progress, duplicate progress,
+bounded waiting after 100%, batch pause with later files pending, late-response
+rejection, and timer cleanup. Python tests cover destination creation, preserving
+existing files, and startup failure on file paths, permission errors, or disk
+space errors. Simulated browser tests do not establish mobile timer behavior
+while a browser or device is suspended.
+
 ## Android to macOS: 2026-11-15
 
 - Sender: Samsung Galaxy A05s (SM-A057G/DSN), Android 15, One UI 7.0, Chrome 149.0.7827.200 (device and software reported by the tester).

@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from phone_lan_transfer.storage import FileTooLargeError, save_file
+from phone_lan_transfer import storage
+from phone_lan_transfer.storage import FileTooLargeError, prepare_destination, save_file
 
 
 def test_save_file_writes_chunks_and_creates_directory(tmp_path: Path) -> None:
@@ -59,10 +60,30 @@ def test_save_file_rejects_unsafe_name_before_creating_directory(
 
 
 @pytest.mark.parametrize("max_bytes", [0, -1])
-def test_save_file_rejects_nonpositive_limit(
-    tmp_path: Path, max_bytes: int
-) -> None:
+def test_save_file_rejects_nonpositive_limit(tmp_path: Path, max_bytes: int) -> None:
     with pytest.raises(ValueError, match="positive"):
         save_file([b"data"], tmp_path / "received", "file.txt", max_bytes=max_bytes)
 
     assert not (tmp_path / "received").exists()
+
+
+def test_prepare_destination_creates_folder_without_leaving_probe(tmp_path):
+    destination = tmp_path / "nested" / "received"
+    prepare_destination(destination)
+    assert destination.is_dir()
+    assert list(destination.iterdir()) == []
+    existing = destination / "keep.txt"
+    existing.write_bytes(b"original")
+    prepare_destination(destination)
+    assert list(destination.iterdir()) == [existing]
+    assert existing.read_bytes() == b"original"
+
+
+def test_prepare_destination_rejects_unwritable_folder(monkeypatch, tmp_path):
+    def denied(*args, **kwargs):
+        raise PermissionError("folder is read-only")
+
+    monkeypatch.setattr(storage, "NamedTemporaryFile", denied)
+    with pytest.raises(PermissionError, match="read-only"):
+        prepare_destination(tmp_path)
+    assert list(tmp_path.iterdir()) == []

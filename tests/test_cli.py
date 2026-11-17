@@ -147,7 +147,8 @@ def test_main_passes_transfer_settings_to_application(
     settings = applications[0].state.transfer_settings
     assert settings.destination_directory == tmp_path / "received files"
     assert settings.max_file_bytes == 1234
-    assert not settings.destination_directory.exists()
+    assert settings.destination_directory.is_dir()
+    assert list(settings.destination_directory.iterdir()) == []
 
 
 @pytest.mark.parametrize("limit", ["0", "-1", "1.5", "not-a-number"])

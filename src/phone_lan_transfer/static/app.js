@@ -9,6 +9,7 @@
   const selectionActions = document.querySelector("#selection-actions");
   const reviewAllButton = document.querySelector("#review-all");
   const sendAllButton = document.querySelector("#send-all");
+  const clearSavedButton = document.querySelector("#clear-saved");
   const batchStatus = document.querySelector("#batch-status");
   const batchProgressWrap = document.querySelector("#batch-progress-wrap");
   const batchProgress = document.querySelector("#batch-progress");
@@ -167,9 +168,13 @@
     const percent = total === 0 ? (finished ? 100 : 0)
       : Math.min(100, Math.floor(sent / total * 100));
     batchProgress.value = percent;
+    batchProgressWrap.hidden = !batchSending || percent === 100;
     batchPercent.textContent = percent === 100 && batchSending
       ? "100% sent. Waiting for the computer to confirm saving..."
       : `Total sent: ${percent}%`;
+    if (percent === 100 && batchSending) {
+      batchStatus.textContent = "100% sent. Waiting for the computer to confirm saving...";
+    }
   }
 
   function clearBatchFeedback() {
@@ -182,8 +187,31 @@
     return new Promise((resolve, reject) => {
       const request = new XMLHttpRequest();
       const query = new URLSearchParams({ destination_name: destinationName });
+      const inactivityMilliseconds = 120000;
+      let inactivityTimer;
+      let settled = false;
+      let uploadComplete = false;
+      let lastLoaded = 0;
+      function finish(error, response) {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(inactivityTimer);
+        if (error) reject(error);
+        else resolve(response);
+      }
+      function watchInactivity() {
+        window.clearTimeout(inactivityTimer);
+        inactivityTimer = window.setTimeout(() => {
+          finish(new Error("Upload inactive or save confirmation timed out"));
+          request.abort();
+        }, inactivityMilliseconds);
+      }
       request.upload.addEventListener("progress", (event) => {
-        if (entry.state !== "sending") return;
+        if (settled || uploadComplete || entry.state !== "sending") return;
+        if (event.loaded > lastLoaded) {
+          lastLoaded = event.loaded;
+          watchInactivity();
+        }
         entry.bytesSent = Math.max(entry.bytesSent || 0, Math.min(entry.file.size, event.loaded));
         entry.percent = event.lengthComputable && event.total > 0
           ? Math.min(100, Math.floor(event.loaded / event.total * 100)) : null;
@@ -194,24 +222,32 @@
         updateBatchProgress();
       });
       request.upload.addEventListener("load", () => {
-        if (entry.state !== "sending") return;
+        if (settled || uploadComplete || entry.state !== "sending") return;
+        uploadComplete = true;
+        // Saving gets its own bounded wait after the final upload byte.
+        watchInactivity();
         entry.percent = 100;
         entry.bytesSent = entry.file.size;
         entry.message = "100% sent. Waiting for the computer to confirm saving...";
         updateUploadProgress(entry);
         updateBatchProgress();
       });
-      request.addEventListener("load", () => resolve({
+      request.addEventListener("load", () => finish(null, {
         status: request.status,
         ok: request.status >= 200 && request.status < 300,
         json: () => JSON.parse(request.responseText),
       }));
       for (const event of ["error", "abort", "timeout"]) {
-        request.addEventListener(event, () => reject(new Error("Upload not confirmed")));
+        request.addEventListener(event, () => finish(new Error("Upload not confirmed")));
       }
-      request.open("POST", `/uploads?${query}`);
-      request.setRequestHeader("Authorization", `Bearer ${accessToken}`);
-      request.send(entry.file);
+      try {
+        request.open("POST", `/uploads?${query}`);
+        request.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+        watchInactivity();
+        request.send(entry.file);
+      } catch (error) {
+        finish(error);
+      }
     });
   }
 
@@ -227,13 +263,16 @@
     const destinationName = entry.destinationName;
     entry.state = "sending";
     entry.percent = null;
+    entry.bytesSent = 0;
     entry.message = "Sending… Keep this page open until the computer confirms the save.";
     renderSelectedFiles();
+    let connectionFailed = false;
     try {
       const response = await uploadWithProgress(entry, destinationName);
       if (!response.ok) {
         if (response.status === 401) {
           accessRejected = true;
+          chooseFilesButton.disabled = true;
           forgetAccessToken();
         }
         const errors = {
@@ -258,11 +297,13 @@
         entry.message = "Saved on the computer.";
       }
     } catch {
+      connectionFailed = true;
       entry.state = "failed";
       entry.message = "Saving could not be confirmed. The file may already be on the computer. Check before retrying; an existing name will not be overwritten.";
     }
     renderSelectedFiles();
     updateBatchProgress();
+    return !connectionFailed;
   }
 
   function createPreview(file) {
@@ -465,7 +506,10 @@
       : `${fileCount} ${fileCount === 1 ? "file" : "files"} · ${formatSize(totalBytes)} total`;
     selectionActions.hidden = fileCount === 0;
     batchStatus.hidden = fileCount === 0;
-    batchProgressWrap.hidden = fileCount === 0 || batchEntries === null;
+    batchProgressWrap.hidden = fileCount === 0 || batchEntries === null || !batchSending
+      || batchProgress.value === 100;
+    clearSavedButton.hidden = !selectedFiles.some((entry) => entry.state === "saved");
+    clearSavedButton.disabled = batchSending || selectedFiles.some((entry) => entry.state === "sending");
     reviewAllButton.disabled = fileCount === 0;
     reviewAllButton.textContent = reviewAll ? "Hide details" : "Review all files";
     const pending = selectedFiles.filter((entry) => entry.state === "pending");
@@ -475,6 +519,19 @@
     sendAllButton.textContent = batchSending ? "Sending…" : "Send all";
   }
 
+  clearSavedButton.addEventListener("click", () => {
+    if (batchSending || selectedFiles.some((entry) => entry.state === "sending")) return;
+    const count = selectedFiles.filter((entry) => entry.state === "saved").length;
+    if (!count) return;
+    if (openEntry && openEntry.state === "saved") openEntry = null;
+    for (let index = selectedFiles.length - 1; index >= 0; index -= 1) {
+      if (selectedFiles[index].state === "saved") selectedFiles.splice(index, 1);
+    }
+    clearBatchFeedback();
+    renderSelectedFiles();
+    if (selectedFiles.length) selectedFilesList.querySelectorAll(".file-open")[0].focus();
+    else chooseFilesButton.focus();
+  });
   reviewAllButton.addEventListener("click", () => {
     reviewAll = !reviewAll;
     openEntry = null;
@@ -485,6 +542,7 @@
     const pending = selectedFiles.filter((entry) => entry.state === "pending");
     if (pending.length === 0 || pending.some((entry) => uploadValidationError(entry))) return;
     batchSending = true;
+    batchProgress.value = 0;
     batchEntries = pending;
     for (const entry of pending) entry.bytesSent = 0;
     chooseFilesButton.disabled = true;
@@ -494,7 +552,8 @@
     for (const [index, entry] of pending.entries()) {
       if (accessRejected) break;
       batchStatus.textContent = `Sending ${index + 1} of ${pending.length} files. Keep this page open.`;
-      await sendFile(entry, true);
+      const responded = await sendFile(entry, true);
+      if (responded === false) break;
     }
     batchSending = false;
     chooseFilesButton.disabled = maxFileBytes === null || accessRejected;

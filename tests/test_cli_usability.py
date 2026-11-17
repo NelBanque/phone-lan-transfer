@@ -1,6 +1,7 @@
 """Check public CLI options and safe startup behavior."""
 
 import argparse
+import errno
 
 import pytest
 
@@ -84,3 +85,43 @@ def test_failed_detection_gives_actionable_error(monkeypatch, capsys):
         cli.main([])
     assert error.value.code == 2
     assert "--lan-address" in capsys.readouterr().err
+
+
+def test_unusable_destination_fails_before_showing_qr_or_starting(
+    monkeypatch, tmp_path, capsys
+):
+    destination = tmp_path / "existing.txt"
+    destination.write_bytes(b"keep this file")
+    monkeypatch.setattr(
+        cli, "detect_lan_ip", lambda: pytest.fail("no QR for a bad folder")
+    )
+    monkeypatch.setattr(
+        cli.uvicorn, "run", lambda *a, **kw: pytest.fail("must not start")
+    )
+    with pytest.raises(SystemExit) as error:
+        cli.main(["-d", str(destination)])
+    assert error.value.code == 2
+    output = capsys.readouterr()
+    assert "Cannot prepare the receiving folder" in output.err
+    assert "-d" in output.err
+    assert "#token=" not in output.out
+    assert destination.read_bytes() == b"keep this file"
+
+
+@pytest.mark.parametrize("error_number", [errno.EACCES, errno.ENOSPC])
+def test_destination_permission_or_space_error_stops_startup(
+    monkeypatch, tmp_path, capsys, error_number
+):
+    def fail_prepare(destination):
+        raise OSError(error_number, "destination unavailable")
+
+    monkeypatch.setattr(cli, "prepare_destination", fail_prepare)
+    monkeypatch.setattr(
+        cli.uvicorn, "run", lambda *a, **kw: pytest.fail("must not start")
+    )
+    with pytest.raises(SystemExit) as error:
+        cli.main(["--local-only", "-d", str(tmp_path)])
+    assert error.value.code == 2
+    output = capsys.readouterr()
+    assert "permissions and free space" in output.err
+    assert "#token=" not in output.out
