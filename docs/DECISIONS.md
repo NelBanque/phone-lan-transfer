@@ -1,95 +1,115 @@
 # Engineering Decisions
 
-This log records decisions made during the project. Entries describe the current direction and may be revised when testing reveals a better approach.
+These records summarize the choices behind Phone LAN Transfer in roughly the order the features were developed. See [Architecture](ARCHITECTURE.md) for the current file flow.
 
-Clear saved removes only confirmed entries from the browser list, with no
-receiving-computer deletion. It is unavailable while any transfer is active.
-The batch bar disappears at 100% sent; a separate text status continues waiting
-for the actual save confirmation. This keeps completed progress out of the way
-without treating uploaded bytes as confirmed saves. The brand icon is served
-as both SVG and a multi-size ICO, including the conventional `/favicon.ico`
-route requested automatically by browsers.
+## 1. Run the receiver on the computer
 
-CLI startup now creates the destination and checks a temporary one-byte write,
-flush, and removal before printing the QR. The alternative was discovering an
-unusable folder only on the first phone upload. This creates the folder earlier
-but provides immediate local feedback. It does not reserve disk space or remove
-the need for upload-time error handling. Constructing an app alone still does
-not write to the destination.
+- **Decision** Serve a browser interface from the receiving computer and transfer general files directly over the local network.
+- **Why** A phone can send photos, videos, or documents without installing an app or using a cloud relay.
+- **Alternative** Build native senders or add a browser inbox on the receiving computer.
+- **Trade-off** Both devices need a network path to each other. Compatibility is verified one device and browser combination at a time.
 
-Uploads abort after two minutes without increasing byte progress, followed by
-a separate two-minute confirmation deadline after the upload body completes.
-A fixed total request timeout would reject large files on slower networks.
-Inactivity and connection failures pause the batch, preserving later pending
-files and manual retries. Saving remains uncertain on a lost confirmation.
-Browser suspension can delay the watchdog; it is not a server-side timeout.
+## 2. Use a small Python web stack
 
-The user-tool installer exports runtime constraints from `uv.lock` with
-`uv export --locked` and installs the checkout in editable mode using them.
-This avoids resolving newer dependencies than those used for development tests.
-It requires keeping a checkout instead of a single Git URL installation. The
-installer does not modify the lockfile; rerun it after lockfile or path changes.
+- **Decision** Use FastAPI and Uvicorn with separate HTML, CSS, and JavaScript assets. Manage the project with `uv`, `pyproject.toml`, and a `src/` layout.
+- **Why** FastAPI provides typed routes and in-process HTTP testing. The lockfile makes dependency versions reproducible.
+- **Alternative** Use Flask or the standard library with manually managed requirements.
+- **Trade-off** Contributors need `uv` and familiarity with the ASGI stack. The package must include the browser assets.
 
-Browser destination-name feedback now follows the server's 255-byte UTF-8
-limit, including the extension, and its reserved-name, whitespace, control
-character, and Unicode rules. Specific messages let users correct a name
-before sending. Browser checks remain advisory; the server validates uploads
-independently. JavaScript uses `TextEncoder` after rejecting unpaired Unicode
-surrogates, which the encoder would otherwise replace silently.
+## 3. Use HTTP on trusted networks
 
-The browser sends one raw `File` per explicit Send action using `XMLHttpRequest`.
-Send all queues pending files sequentially through the same path, preserving
-individual progress and results. Failed files are not retried automatically;
-an expired token or uncertain connection pauses the queue. Review all files exposes previews and name
-fields together, while the compact list remains available for long selections.
-The batch progress bar sums browser-reported bytes across queued files, so
-larger files contribute proportionally. It describes bytes sent, not confirmed
-saves; the final per-file results remain authoritative.
-Each entry has pending, sending, saved, and failed states and manual retry.
-Names are locked while sending and after saving; in-flight entries cannot be
-removed. Saved requires HTTP 201 and the expected confirmation body. A lost or
-invalid confirmation produces an uncertainty message, since the file may
-already exist on the computer. Upload progress events update only the file's
-bar and status text, preserving previews and focus. Percentages use reported
-bytes and total; unknown totals use an indeterminate native progress element.
-Completing the upload body means waiting for save confirmation, not success.
-`fetch` remains in use for settings; it was replaced for uploads because its
-usual interface does not expose upload progress events. No conversion,
-recompression, automatic retry, or full-file JavaScript read is introduced.
+- **Decision** Serve transfers over local HTTP.
+- **Why** Phones can open the link without installing or trusting a local certificate.
+- **Alternative** Generate a local HTTPS certificate.
+- **Trade-off** Traffic is unencrypted. Use the receiver on a trusted local network. See [Security](SECURITY.md).
 
-The `phonelt` alias starts LAN reception with a visible destination, size limit,
-help hint, and trusted-network notice. `--local-only` disables LAN access; the
-long command and old `--lan` flag remain compatible. Short options are `-h`,
-`-d`, `-m`, and `-p`. GiB values convert exactly to whole bytes before storage.
-Platformdirs locates the system Downloads folder, whose `Phone LAN Transfer`
-subfolder replaces the working-directory `uploads` default. Explicit relative
-destinations still use the startup directory. An unsupported QR encoding falls
-back to the text URL. This adds a dependency rather than maintaining separate
-platform-specific directory discovery code in the application.
+## 4. Put a temporary token in the QR link
 
-| Decision | Why | Alternative considered | Trade-off |
-| --- | --- | --- | --- |
-| Run a local web server on the receiving computer and use a browser on the phone. | The phone needs no installed app, the transfer stays on the local network, and the same web architecture can support multiple platforms. | Build separate native mobile apps. | Both devices must be able to reach each other; local HTTP has security limits and browser behavior varies. |
-| Build a safe upload MVP before adding HEIC conversion, EXIF sorting, and duplicate detection. | A smaller first version is easier to test and explain. | Add media processing from the start. | The app preserves the bytes supplied by the browser. A mobile file picker may supply a converted copy. |
-| Keep engineering decisions public and interview study notes private. | Reviewers can inspect the reasoning without personal practice material. | Publish every working note. | Private notes must be backed up separately from the Git repository. |
-| Manage the Python project with `pyproject.toml`, `uv`, and a `src/` layout. | The project has explicit metadata, reproducible dependencies, and a clear separation between application code and repository files. | Use `venv` and `pip` manually with a `requirements.txt` file. | Installation and development use `uv`. The user tool requires keeping its source checkout. |
-| Use FastAPI with uvicorn and begin with a `GET /health` endpoint. | Type hints, automatic JSON responses, and in-process HTTP testing provide a small but testable server foundation. | Use Flask or Python's standard HTTP server. | FastAPI and its ASGI stack add dependencies and asynchronous concepts that must be understood. |
-| Design for mobile devices with modern browsers and Windows, macOS, and Linux receivers, while validating one combination at a time. | The web and Python stack is portable, and a broader tool is more useful without requiring separate mobile apps. | Keep the product limited to iPhone and Windows. | The compatibility test matrix is larger, and packaging, paths, permissions, formats, and firewalls differ by platform. |
-| Use HTTP for the MVP only on personal or trusted local networks. | It keeps setup simple and avoids certificate warnings or installation steps on mobile devices. | Generate a local HTTPS certificate. | Traffic is not encrypted, so public and untrusted networks are not supported. HTTPS can be investigated later. |
-| Generate a fresh random access token for each server run and carry it in the QR URL fragment. | A fragment is not included in the initial HTTP request; browser code can send the token in an authorization header only when needed. | Put the token in a query parameter or use a persistent password. | Anyone who sees the QR code can use the token until the server stops. |
-| Enable LAN reception by default, with a visible startup notice and a `--local-only` opt-out. | The normal command should immediately support the intended phone-to-computer workflow. | Require `--lan` on every startup, as earlier versions did. | Starting the CLI exposes the receiver on IPv4 interfaces; trusted-network use and firewall guidance remain essential. |
-| Generate the terminal QR code with Segno and keep the access URL visible as text. | Segno is a pure-Python library with no runtime dependencies and can render a compact QR code directly in the terminal. | Use the `qrcode` package or implement QR encoding manually. | Unicode terminal rendering must be tested across platforms; the text URL remains available as a fallback. |
-| Allow a validated `--lan-address` override while keeping the LAN binding on `0.0.0.0`. | Automatic default-route detection can select a VPN or the wrong interface on computers with multiple connections. | Bind the server directly to the manually selected address. | The user must identify the correct IPv4 address, but the server remains reachable through any usable local interface. |
-| Serve the browser interface as separate HTML, CSS, and JavaScript files packaged with the application. | Separating structure, presentation, and behavior keeps the mobile interface easier to understand, test, and extend. | Embed the complete page in a Python response or one HTML file. | The application manages several static files and must include them when packaged. |
-| Remove the URL fragment and retain the temporary token in sessionStorage for reload recovery. | Reloading the current tab should not require scanning again. A new QR token takes priority; settings and upload 401 responses clear stored access. The server remains authoritative. | Keep the token only in memory and require the QR after reload, or persist it in localStorage across sessions. | Same-origin scripts can read storage; tab duplication or browser session restoration may retain it. Closing a tab is not revocation. Server restart invalidates old tokens. Blocked storage falls back to memory; selected files are not restored. |
-| Transfer general file types directly into a local folder on the receiving computer. | The same safe byte-streaming mechanism can support photos, videos, PDFs, documents, archives, and other files without an unnecessary second download step. | Restrict selection to media files or add a browser-based inbox on the computer. | General files are more useful but must be treated as potentially unsafe content; the application stores them without guaranteeing that their contents are safe. |
-| Use the browser's native multiple-file picker and keep the selection in page memory. | Mobile browsers already provide a familiar picker for photos, documents, and other files; a list with removal and a size summary makes the pending transfer clear. | Build a custom drag-and-drop picker or replace the selection on every pick. | Selecting the same file twice can create two entries, and reloading the page clears the selection. Selection alone sends nothing; each file has an explicit Send action. |
-| Keep the page's main path focused on selecting files, with link errors shown only when needed and network guidance under a native “How it works” disclosure. | A token's presence does not prove a connection, and the upload page is easier to scan when selection is prominent. | Always show a green connection card, a longer introduction, and visible footer instructions. | Less guidance appears up front; a missing token still requires a clear error, and users can expand the guidance when needed. |
-| Open selected files inline for supported image and video previews and an editable destination name. | The user can identify a file and choose its receiving-computer name before uploading. The original file and extension remain unchanged. | Preview every file format or edit the original `File` name. | Arbitrary documents may lack a browser preview; object URLs must be released, and the server must validate destination names and avoid collisions before saving. |
-| Keep the MVP browser page in English and add a language switcher when translated interfaces exist. | A one-language switcher offers no choice, and the current page already identifies English with `lang="en"` for assistive technology. | Build English and Spanish translations now. | Spanish-speaking users see English until a complete translation can be tested alongside the upload flow. |
-| Reject unsafe destination names on the receiving server before writing, using a portable 255-byte UTF-8 filename limit. | Browser checks can be bypassed, and the computer must control where files are saved. Keeping the proposed name unchanged avoids surprising silent renames. | Trust the browser or silently sanitize names. | The browser mirrors these rules for immediate feedback. The server still validates every upload. |
-| Give each selected file its own upload result and a way to correct or retry failures. | A person needs to know which file was saved and which failed because of its name, size, network connection, destination collision, or another error. | Show only one success or failure message for the whole selection. | The browser and server need explicit per-file states and error responses; the interface must not claim success before the server confirms a save. |
-| Start uploads with a configurable 5 GiB per-file limit, enforced by the receiving server while streaming. | A useful default accommodates many videos, while each user can raise it at startup without editing source code. | Use a small fixed limit or accept files of any size. | Very large videos may still require a higher setting; the server must clean up partial files and report size or storage failures for the affected file. The authenticated upload endpoint now enforces this limit while streaming; the browser displays the active limit and supports individual sends. |
-| Save received chunks with exclusive file creation and remove the new file when a handled transfer error occurs. | Exclusive creation prevents overwriting an existing name on different desktop file systems without needing a second full-size copy. | Write to a temporary file and publish it with a hard link. | A partial file is visible during transfer and can remain after an abrupt process or power failure; hard links are unavailable on some removable-drive file systems. The authenticated upload endpoint now calls this storage function. |
-| Configure the destination folder and positive per-file byte limit at startup, keeping immutable settings on the application. | Each server run can use a different receiving folder and limit without editing source code; relative paths resolve against the startup directory. | Hard-code settings or read them independently inside each endpoint. | CLI startup now verifies a temporary write. App construction alone does not create the folder; the upload endpoint enforces limits and still handles storage failures. |
-| Receive one file per authenticated POST as a raw streamed HTTP body, with the destination name in a query parameter. | The existing storage function can enforce the configured limit and clean up partial files while receiving, without a full multipart spool copy. A worker thread handles blocking disk writes while AnyIO bridges network reads. | Use multipart UploadFile or load the full body into memory. | The browser must send a raw File body and URL-encode its proposed name. AnyIO is a direct dependency. Success is returned after writing and closing, not a guarantee against power loss; browser sending is implemented, and the recorded phone integrity check is scoped in docs/TESTING.md. |
+- **Decision** Generate a fresh token per server run, put it in the URL fragment, and require it as a Bearer token for protected requests.
+- **Why** The fragment stays out of the initial HTTP request. The browser can read it and authorize subsequent requests.
+- **Alternative** Put the token in the query string or use a persistent password.
+- **Trade-off** Anyone with the current QR link can use the token until the server stops.
+
+## 5. Display the connection QR and a text fallback
+
+- **Decision** Render the QR in the terminal with Segno and print the access URL alongside it. Allow `--lan-address` to override the address in the link.
+- **Why** QR scanning is quick, and the override helps when automatic detection picks a VPN or the wrong interface.
+- **Alternative** Require users to type the address or bind the listener to the advertised address.
+- **Trade-off** Terminal QR rendering depends on Unicode support. The override changes the advertised address while the LAN listener still binds to all IPv4 interfaces.
+
+## 6. Use the native picker and keep selection in memory
+
+- **Decision** Use the browser's multiple-file picker, with optional inline previews and editable destination names. Keep network guidance in an expandable section.
+- **Why** Users can choose, review, and remove files before explicitly sending them.
+- **Alternative** Build a custom picker or upload immediately after selection.
+- **Trade-off** Reloading clears the selection. Preview support depends on the browser and file format.
+
+## 7. Validate filenames and create files exclusively
+
+- **Decision** Check portable filenames server-side, including a 255-byte UTF-8 limit. Open each destination exclusively and remove partial files on handled failures.
+- **Why** The server controls the destination and protects existing files. The browser mirrors the naming checks for immediate feedback.
+- **Alternative** Trust the browser, silently rename collisions, or publish temporary files using hard links.
+- **Trade-off** An incomplete file can be visible during a transfer and may remain after an abrupt stop. Exclusive creation works on destinations without hard-link support.
+
+## 8. Stream one raw file per authenticated request
+
+- **Decision** Send one raw file body per upload, with the destination name in the query string. Bridge network reads to a disk-writing worker with AnyIO and enforce a configurable per-file limit.
+- **Why** The receiver writes and counts bytes as they arrive. The browser sends the bytes it was given without recompression or conversion.
+- **Alternative** Buffer the body in memory or use multipart spooling.
+- **Trade-off** The client URL-encodes the filename, and the server coordinates the async request stream with synchronous disk writes. A phone's picker can supply a converted file.
+
+## 9. Report progress and save confirmation separately
+
+- **Decision** Use `XMLHttpRequest` for upload progress and `fetch` for settings. Track each file as pending, sending, saved, or failed. Show **Saved** after validating the HTTP 201 response.
+- **Why** A user can see how much was sent and which files the receiver confirmed.
+- **Alternative** Show a single overall result or mark a file saved at 100% upload progress.
+- **Trade-off** A lost response leaves the save uncertain. The user checks the receiving folder before retrying.
+
+## 10. Recover access after a page reload
+
+- **Decision** Remove the token from the visible URL and keep it in `sessionStorage`. A new QR token takes priority. An HTTP 401 clears stored access.
+- **Why** Reloading the current tab can recover access while the same server session is active.
+- **Alternative** Keep the token only in memory or persist it in `localStorage`.
+- **Trade-off** Same-origin scripts can read session storage. Browser session restoration can retain it, and blocked storage requires reopening the QR after a reload.
+
+## 11. Make LAN reception the default CLI workflow
+
+- **Decision** Start LAN reception with `phonelt`, with `--local-only` for loopback. Keep immutable per-run settings and default to Downloads/Phone LAN Transfer and 5 GiB per file.
+- **Why** The usual transfer starts with one command. Platformdirs locates Downloads, and the CLI converts GiB values to whole bytes.
+- **Alternative** Require a LAN flag and use a fixed path and byte limit.
+- **Trade-off** LAN mode listens on all IPv4 interfaces. The CLI prints the destination and network guidance at startup.
+
+## 12. Send batches sequentially
+
+- **Decision** Send pending files one at a time through the same path as an individual upload. Weight total progress by bytes and retain each save result.
+- **Why** A batch is convenient and users can still identify the outcome of each file.
+- **Alternative** Upload in parallel or report only one result for the batch.
+- **Trade-off** Files wait their turn. An uncertain connection pauses the queue and retries are manual.
+
+## 13. Test the destination before displaying the QR
+
+- **Decision** Create the destination if needed, then write, flush, and remove a temporary probe at CLI startup.
+- **Why** An unusable folder produces immediate feedback before someone tries to upload from a phone.
+- **Alternative** Discover folder problems on the first upload.
+- **Trade-off** Startup performs a small disk operation. The upload still handles subsequent storage failures.
+
+## 14. Use separate inactivity and confirmation deadlines
+
+- **Decision** Refresh a two-minute upload timer when the browser reports new bytes. Start a separate two-minute confirmation timer when the body finishes sending.
+- **Why** A large transfer can continue while it makes progress, and a stalled request gets a bounded wait.
+- **Alternative** Set one deadline for the entire request.
+- **Trade-off** Browser suspension can delay timers. An expired confirmation leaves the same uncertainty as a lost response.
+
+## 15. Install the CLI from the locked checkout
+
+- **Decision** Export runtime constraints from `uv.lock` and install the checkout as an editable user tool.
+- **Why** The installed `phonelt` uses the runtime dependency versions selected for development.
+- **Alternative** Install from a Git URL and resolve dependencies at installation time.
+- **Trade-off** Keep the checkout in place and rerun the installer after moving it or updating the lockfile.
+
+## 16. Keep the transfer interface focused
+
+- **Decision** Keep one English interface, hide the batch bar at 100% sent, and show a separate confirmation status. **Clear saved** removes confirmed entries from the browser list while keeping the received files.
+- **Why** The list stays useful during long batches and makes the remaining work visible.
+- **Alternative** Keep completed progress visible or add controls for deleting files on the receiver.
+- **Trade-off** The page is focused on sending. Saved files are managed on the receiving computer, and translations require a complete localized interface.

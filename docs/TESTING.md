@@ -53,7 +53,7 @@ while a browser or device is suspended.
 
 - Sender: Samsung Galaxy A05s (SM-A057G/DSN), Android 15, One UI 7.0, Chrome 149.0.7827.200 (device and software reported by the tester).
 - Receiver: MacBook Air, macOS 26.0.1 (build 25A362).
-- Network: the Mac and Galaxy were connected through a third phone's mobile hotspot, as reported by the tester. This verifies this local-network arrangement; it does not establish behavior on every Wi-Fi network.
+- Network: the Mac and Galaxy were connected through a third phone's mobile hotspot, as reported by the tester.
 - File: `transfer-integrity.zip`, 1,048,855 bytes.
 - Preparation: the known test ZIP was served from the Mac over the trusted local network and downloaded to Android without extraction.
 - Transfer: the tester selected the downloaded ZIP in Phone LAN Transfer and reported a completed upload. The received file was found in `Downloads/Phone LAN Transfer` on the Mac.
@@ -63,7 +63,7 @@ while a browser or device is suspended.
 71bc9bdb690f9641a75b34861940f83d2ad115f06eafc0b0a309b2ed2ca74d01
 ```
 
-Result: byte integrity passed for this ZIP transfer. The tester also reported successful photo and video transfers from Android to this Mac, without recorded file-level integrity checks or complete format details. This does not establish compatibility for every file type, Android browser, or large-file size. The temporary download server was stopped after verification.
+The ZIP passed the integrity check. The tester also reported successful photo and video transfers. SHA-256 verification covered the ZIP only. The temporary download server was stopped afterward.
 
 ## iPhone to Windows: 2026-11-12
 
@@ -78,7 +78,7 @@ Result: byte integrity passed for this ZIP transfer. The tester also reported su
 71bc9bdb690f9641a75b34861940f83d2ad115f06eafc0b0a309b2ed2ca74d01
 ```
 
-Result: byte integrity passed for this ZIP transfer. This does not establish compatibility for every file type, device, browser, or large-file size. Photo-picker conversion and original photo-library metadata were not tested.
+The ZIP passed the integrity check. Photo-picker conversion and original photo-library metadata were outside the scope of this check.
 
 ## Reload access recovery: 2026-11-12
 

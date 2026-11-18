@@ -142,7 +142,6 @@ Failures offer manual correction/retry, without removing other successful files.
 Progress measures bytes sent by the browser. Unknown totals use an indeterminate
 bar. Even 100% means waiting: Saved requires HTTP 201, `status: saved`, and the
 expected destination name after the server has written and closed the file.
-This confirmation does not promise durability across power loss.
 
 If the response is lost or invalid, the file may already exist on the computer.
 The page asks the user to check before retrying; retries are not automatic and
