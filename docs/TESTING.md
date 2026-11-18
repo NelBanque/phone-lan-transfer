@@ -22,7 +22,7 @@ disappears before confirmation, Saved appears only after the response, and
 Clear saved leaves the received disk file untouched. The current regression
 suite has 124 Python tests and 29 Node browser simulations.
 
-The README now uses the final 50-second demo. It shows the transfer workflow.
+The final 50-second demo in the README shows the transfer workflow.
 The ZIP checks below provide the separate byte-integrity results. See
 [demo assets](media/README.md) for the final recording details.
 

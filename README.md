@@ -1,5 +1,7 @@
 # Phone LAN Transfer
 
+[![CI](https://github.com/NelBanque/phone-lan-transfer/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/NelBanque/phone-lan-transfer/actions/workflows/ci.yml)
+
 Send files from your phone to your computer over a local network. Run `phonelt` on your computer, scan its QR code, and send files from your phone's browser.
 
 I built this to send photos, videos, and documents from my phone to my computer without installing a mobile app. Created by **Nel Banqué**.
