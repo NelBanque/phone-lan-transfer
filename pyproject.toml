@@ -1,6 +1,6 @@
 [project]
 name = "phone-lan-transfer"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Transfer files from a phone to a computer over a local network."
 readme = "README.md"
 requires-python = ">=3.11"
