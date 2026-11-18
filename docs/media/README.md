@@ -11,7 +11,7 @@ Both recordings are shown in full at their original speed. The phone starts
 The first and last phone frames fill the gaps on either side.
 
 The QR code and link remain visible so the connection step can be followed.
-The recorded server session is closed and its token expired when it stopped.
+The receiver stopped after recording, ending the session and invalidating its token.
 The Windows username, the IP shown by the iPhone camera and Safari, Safari's
 start page during the transition, and both OneDrive accounts in the iPhone
 file picker are blurred. The export is silent.

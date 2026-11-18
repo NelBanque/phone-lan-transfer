@@ -22,11 +22,9 @@ disappears before confirmation, Saved appears only after the response, and
 Clear saved leaves the received disk file untouched. The current regression
 suite has 124 Python tests and 29 Node browser simulations.
 
-At this checkpoint the README contained a 59-second review export of the two
-complete recordings. All 1,770 frames decode; it is Full HD at 30 fps, without
-audio. GIF timing and local media links were checked. This recording is a
-workflow demonstration; no additional byte-integrity claim is made. Further
-video review remains pending.
+The README now uses the final 50-second demo. It shows the transfer workflow.
+The ZIP checks below provide the separate byte-integrity results. See
+[demo assets](media/README.md) for the final recording details.
 
 ## Local receiver and recovery checks: 2026-11-16
 

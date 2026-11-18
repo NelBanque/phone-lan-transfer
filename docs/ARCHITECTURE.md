@@ -25,25 +25,33 @@ sequenceDiagram
     participant Phone as Mobile browser
     participant API as FastAPI server
     participant Disk as Destination folder
-    CLI->>API: Start with token, destination and limit
-    CLI-->>Phone: Access URL / QR with fragment token
-    Phone->>API: GET / and static assets
+    CLI->>Disk: Prepare folder and verify a temporary write
+    CLI->>API: Build app with token, destination and limit
+    Note over CLI: Display QR and start the HTTP server
+    CLI-->>Phone: User scans QR with token in URL fragment
+    Phone->>API: GET / and static assets without the fragment
     API-->>Phone: HTML, CSS and JavaScript
     Phone->>API: GET /transfer-settings + Bearer token
     API-->>Phone: Active max_file_bytes
     Note over Phone: Select, preview and optionally rename
     Phone->>API: POST /uploads?destination_name=... + Bearer token + raw File
     API->>API: Authenticate and validate destination name
-    API->>Disk: Create exclusively and write size-checked chunks
-    Note over Phone: Upload progress is not save confirmation
-    Disk-->>API: Write and close complete
-    API-->>Phone: 201 with saved status and destination name
-    Note over Phone: Show Saved after validating confirmation
+    API->>Disk: Create file without overwriting
+    Note over Phone: Progress tracks bytes sent
+    alt File stays within the limit and saves successfully
+        API->>Disk: Write chunks and close the file
+        API-->>Phone: HTTP 201 with saved status and destination name
+        Note over Phone: Show Saved after validating confirmation
+    else A chunk would exceed the limit
+        API->>Disk: Close and remove the partial file
+        API-->>Phone: HTTP 413
+    end
 ```
 
 ### 1. Start the receiver
 
-The CLI creates a fresh random token and `TransferSettings`. The default
+The CLI prepares `TransferSettings` and checks the receiving folder before
+generating a fresh random token. The default
 destination is the system Downloads folder's `Phone LAN Transfer` subfolder;
 the default per-file limit is 5 GiB. CLI startup creates the folder if needed
 and writes, flushes, and removes a temporary probe before displaying the QR.
@@ -51,8 +59,9 @@ An unusable destination stops startup with an actionable error. This checks
 current access, not future free space or durability. App construction alone
 remains free of destination writes; the upload path still handles storage errors.
 
-The default listener is `0.0.0.0`; `--local-only` uses `127.0.0.1`.
-the phone uses the computer's detected LAN IPv4 address, or `--lan-address`.
+The default listener is `0.0.0.0`. The `--local-only` option uses `127.0.0.1`.
+The phone connects to the computer's detected LAN IPv4 address or the address
+supplied with `--lan-address`.
 The override changes the advertised address, not the listener binding.
 `phonelt` and `phone-lan-transfer` call the same CLI. Decimal GiB limits are
 converted to whole bytes before configuring storage; `--max-file-bytes` remains

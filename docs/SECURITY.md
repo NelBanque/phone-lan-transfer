@@ -1,9 +1,7 @@
 # Security
 
-Phone LAN Transfer is designed for temporary transfers over a personal or
-trusted Wi-Fi network. When it is used on a protected home network with trusted
-devices, its temporary access controls make it suitable for its intended local
-use. It must not be exposed to the internet.
+Use Phone LAN Transfer for temporary transfers between trusted devices on a
+private local network. Keep the receiver off the public internet.
 
 ## Main protections
 
@@ -31,5 +29,4 @@ Avoid public, guest, hotel, university, or other shared networks.
 6. Open transferred files only when you trust their source. The application
    stores general file types but does not prove that their contents are safe.
 
-More detailed engineering trade-offs are recorded in `docs/DECISIONS.md` as
-they are implemented and tested.
+See [engineering decisions](DECISIONS.md) for the trade-offs behind these controls.
