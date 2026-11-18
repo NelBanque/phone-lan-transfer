@@ -1,41 +1,21 @@
 # Demo assets
 
-Recorded on 2026-11-16 at approximately 23:36 using an iPhone with Safari and a
-Windows receiver. This export shows both source recordings in full.
+Recorded on November 17, 2026, using Safari on an iPhone and a Windows receiver.
 
-- `phone-lan-transfer-demo.mp4`: 59-second, 1920 × 1080 H.264 video at 30 fps, without audio.
-- `phone-lan-transfer-demo.gif`: 1152 × 648 animated README preview at 8 fps.
-- `phone-lan-transfer-demo-poster.png`: still showing the phone save results and received files.
+- `phone-lan-transfer-demo.mp4` is the complete 50-second H.264 export at 1920 × 1080 and 30 fps.
+- `phone-lan-transfer-demo.gif` is the 1152 × 648 animated README preview at 8 fps.
+- `phone-lan-transfer-demo-poster.png` shows the phone's save confirmation and the received files on Windows.
 
-## Timing and presentation
+Both recordings are shown in full at their original speed. The phone starts
+1.1 seconds after the Windows recording to align transfer and save events.
+The first and last phone frames fill the gaps on either side.
 
-The Windows source is 51.93 seconds and the phone source is 49.15 seconds.
-Neither recording is cropped, censored, sped up or shortened. Both are scaled
-to fit the presentation while preserving the complete screen content.
+The QR code and link remain visible so the connection step can be followed.
+The recorded server session is closed and its token expired when it stopped.
+The Windows username, the IP shown by the iPhone camera and Safari, Safari's
+start page during the transition, and both OneDrive accounts in the iPhone
+file picker are blurred. The export is silent.
 
-The Windows capture starts after a three-second opening hold. The phone starts
-1.3 seconds later to align the upload/save events. A shared two-second pause
-holds the typed `phonelt` command before the QR appears (Windows source time
-4.1 seconds, phone source time 2.8 seconds). Closing holds let the longer
-recording finish. All other footage plays at its original speed.
-
-The video includes the camera, native pickers, photo gallery, keyboard,
-previews, all three file transfers, Windows file inspection, and the phone's
-closing Control Center. Clear saved is visible but is not pressed.
-
-## Review and privacy
-
-This is an unredacted review version. It retains on-screen account labels,
-personal keyboard suggestions, local user paths, the QR/token and local IP
-addresses. The session shown in the QR must be stopped before public sharing;
-restarting the receiver generates a new token. Audio and source creation
-metadata are omitted, as in the earlier exports.
-
-The source Windows capture is 1280 × 720 and remains at native size inside the
-Full HD layout. The phone is scaled down from 1206 × 2622. Increasing the canvas
-resolution does not restore detail absent from the sources. Use the MP4 for
-the clearest playback; the GIF is a smaller preview.
-
-The earlier 30-second edited version, original recordings, render recipes and
-review notes are preserved privately in OneDrive, outside the public repository.
-No new byte-integrity test is claimed; see [manual verification](../TESTING.md).
+The demo shows file selection, previews, renaming, sending three files
+together, and opening the received files on Windows. For the recorded
+byte-integrity tests, see [manual verification](../TESTING.md).

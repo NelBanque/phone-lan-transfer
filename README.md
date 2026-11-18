@@ -8,13 +8,11 @@ Review and rename files on an iPhone, send them together, and find them on Windo
 
 [![Animated demo: iPhone file review, Send all, save confirmations, and received files on Windows](docs/media/phone-lan-transfer-demo.gif)](docs/media/phone-lan-transfer-demo.mp4)
 
-[Watch the complete 59-second Full HD video](docs/media/phone-lan-transfer-demo.mp4) ·
+[Watch the complete 50-second Full HD video](docs/media/phone-lan-transfer-demo.mp4) ·
 [Still preview](docs/media/phone-lan-transfer-demo-poster.png)
 
-Both screen recordings are shown in full, synchronized side by side. Opening
-pauses leave time to read the typed `phonelt` command; the recordings otherwise
-play at their original speed. No audio. This review version is unredacted.
-QR access expires when its server session stops.
+Both screen recordings play in full at their original speed, synchronized side
+by side. The QR code shows a closed session. The video is silent.
 
 ## Why I built this
 

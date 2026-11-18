@@ -10,7 +10,7 @@ disappears before confirmation, Saved appears only after the response, and
 Clear saved leaves the received disk file untouched. The current regression
 suite has 124 Python tests and 29 Node browser simulations.
 
-The README currently contains a 59-second unredacted review export of the two
+At this checkpoint the README contained a 59-second review export of the two
 complete recordings. All 1,770 frames decode; it is Full HD at 30 fps, without
 audio. GIF timing and local media links were checked. This recording is a
 workflow demonstration; no additional byte-integrity claim is made. Further
