@@ -121,7 +121,6 @@ h1 {
   letter-spacing: -0.045em;
 }
 
-.connection,
 .file-selection {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -133,22 +132,11 @@ h1 {
 }
 
 .connection {
-  background: var(--danger-soft);
-  border: 1px solid rgba(186, 51, 70, 0.16);
+  margin-top: clamp(1.6rem, 5vw, 2.4rem);
 }
 
 .connection[hidden] {
   display: none;
-}
-
-.status-icon {
-  width: 0.85rem;
-  height: 0.85rem;
-  margin: 0.55rem;
-  background: var(--danger);
-  border: 0.22rem solid white;
-  border-radius: 50%;
-  box-shadow: 0 0 0 0.24rem rgba(186, 51, 70, 0.16);
 }
 
 .connection h2,
@@ -158,12 +146,15 @@ h1 {
   line-height: 1.35;
 }
 
-.connection p,
 .file-selection p {
   margin-bottom: 0;
   color: var(--text-muted);
   font-size: 0.9rem;
   line-height: 1.5;
+}
+
+.connection p {
+  margin-bottom: 0;
 }
 
 .file-selection {
@@ -470,17 +461,13 @@ h1 {
   font-size: 0.85rem;
 }
 
-.file-name-error {
-  margin-bottom: 0;
-  color: var(--danger);
-  font-size: 0.8rem;
+.file-name-error,
+.file-size-error {
+  margin: 0;
 }
 
 .file-size-error {
-  margin: 0;
-  padding: 0 0.75rem 0.85rem;
-  color: var(--danger);
-  font-size: 0.85rem;
+  margin: 0 0.75rem 0.85rem;
 }
 
 .retry-settings {
@@ -521,7 +508,10 @@ h1 {
   overflow-wrap: anywhere;
 }
 
-.selection-results .transfer-status-error {
+.connection,
+.file-name-error,
+.file-size-error,
+.transfer-status-error {
   min-width: 0;
   padding: 0.75rem;
   color: #962338;
@@ -529,9 +519,9 @@ h1 {
   border: 1px solid var(--danger);
   border-left-width: 0.25rem;
   border-radius: 0.5rem;
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 0.9rem;
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .send-file {

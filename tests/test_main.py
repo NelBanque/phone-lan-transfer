@@ -12,13 +12,13 @@ def test_index_returns_browser_page() -> None:
     assert response.headers["content-type"].startswith("text/html")
     assert '<meta name="viewport"' in response.text
     assert 'src="/static/app.js"' in response.text
-    assert 'href="/static/styles.css"' in response.text
+    assert 'href="/static/styles.css?v=2"' in response.text
     assert 'href="/favicon.ico"' in response.text
     assert 'href="/static/favicon.svg"' in response.text
 
 
 def test_stylesheet_is_served() -> None:
-    response = client.get("/static/styles.css")
+    response = client.get("/static/styles.css?v=2")
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/css")

@@ -1,5 +1,17 @@
 # Manual transfer verification
 
+## Per-file limit check (1 KiB)
+
+On iPhone, with the receiver started using `phonelt --max-file-bytes 1024`,
+selecting a video over the limit showed the file-size warning and disabled
+Send. The warning displayed the shared error styling.
+
+In a separate in-process check against the FastAPI app, an authenticated
+upload supplied two 768-byte chunks without a Content-Length header. The app
+returned HTTP 413 and the temporary receiving folder was empty afterward.
+An upload of exactly 1,024 bytes then returned HTTP 201, and the saved bytes
+matched the request body.
+
 ## Closing checks: 2026-11-17
 
 The final application changes include the original interface with a gray
